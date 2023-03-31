@@ -2,7 +2,7 @@
 
 use anyhow::{anyhow, Result};
 use clap::{ArgAction, Parser};
-use ethers::prelude::{rand::thread_rng, Address, LocalWallet, Provider, SignerMiddleware, Ws};
+use ethers::prelude::{Address, Provider, SignerMiddleware, Ws};
 use op_challenger_driver::{
     config::DriverConfig,
     drivers::{DisputeDriver, OutputAttestationDriver, TxDispatchDriver},
@@ -29,6 +29,15 @@ struct Args {
     )]
     ws_endpoint: String,
 
+    /// The private key used for signing transactions.
+    #[arg(
+        long,
+        short,
+        help = "The private key used for signing transactions.",
+        env = "OP_CHALLENGER_KEY"
+    )]
+    signer_key: String,
+
     /// The address of the dispute game factory contract.
     #[arg(
         long,
@@ -54,6 +63,7 @@ async fn main() -> Result<()> {
     let Args {
         v,
         ws_endpoint,
+        signer_key,
         dispute_game_factory,
         l2_output_oracle,
     } = Args::parse();
@@ -73,7 +83,7 @@ async fn main() -> Result<()> {
     tracing::debug!(target: "op-challenger-cli", "Connecting to websocket endpoint...");
     let ws_endpoint = Arc::new(SignerMiddleware::new(
         Provider::<Ws>::connect(driver_config.ws_endpoint.clone()).await?,
-        LocalWallet::new(&mut thread_rng()), // TODO: Take in private key from env or CLI flags
+        signer_key.parse()?,
     ));
     tracing::info!(target: "op-challenger-cli", "Websocket connected successfully @ {}", &driver_config.ws_endpoint);
 
