@@ -1,0 +1,10 @@
+[package]
+name = "op-challenger-tui"
+description = "The TUI for the OP Challenger"
+authors = ["clabby"]
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.70"
+tracing = "0.1.37"
