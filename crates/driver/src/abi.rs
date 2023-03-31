@@ -5,6 +5,7 @@ abigen!(
     DisputeGame_Factory,
     r"[
         event DisputeGameCreated(address indexed, uint8 indexed, bytes32 indexed)
+        function create(uint8 gameType, bytes32 rootClaim, bytes calldata extraData) external returns (address _proxy)
     ]"
 );
 

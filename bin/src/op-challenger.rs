@@ -2,8 +2,7 @@
 
 use anyhow::{anyhow, Result};
 use clap::{ArgAction, Parser};
-use ethers::providers::{Provider, Ws};
-use ethers::types::Address;
+use ethers::prelude::{rand::thread_rng, Address, LocalWallet, Provider, SignerMiddleware, Ws};
 use op_challenger_driver::{
     config::DriverConfig,
     drivers::{DisputeDriver, OutputAttestationDriver, TxDispatchDriver},
@@ -72,7 +71,10 @@ async fn main() -> Result<()> {
 
     // Connect to the websocket endpoint.
     tracing::debug!(target: "op-challenger-cli", "Connecting to websocket endpoint...");
-    let ws_endpoint = Arc::new(Provider::<Ws>::connect(driver_config.ws_endpoint.clone()).await?);
+    let ws_endpoint = Arc::new(SignerMiddleware::new(
+        Provider::<Ws>::connect(driver_config.ws_endpoint.clone()).await?,
+        LocalWallet::new(&mut thread_rng()), // TODO: Take in private key from env or CLI flags
+    ));
     tracing::info!(target: "op-challenger-cli", "Websocket connected successfully @ {}", &driver_config.ws_endpoint);
 
     // Creates a new driver stack and starts the driver loops.
