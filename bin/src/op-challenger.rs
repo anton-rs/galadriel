@@ -8,7 +8,8 @@ use ethers::providers::{Provider, Ws};
 use ethers::types::Address;
 use op_challenger_driver::config::DriverConfig;
 use op_challenger_driver::drivers::{DisputeDriver, OutputAttestationDriver};
-use op_challenger_driver::{driver_stack, Driver};
+use op_challenger_driver::Driver;
+use tokio::task::JoinSet;
 use tracing::Level;
 
 /// Arguments for the `op-challenger` binary.
@@ -61,7 +62,11 @@ async fn main() -> Result<()> {
     init_tracing_subscriber(v)?;
 
     // Create the driver config.
-    let driver_config = DriverConfig::new(ws_endpoint, dispute_game_factory, l2_output_oracle);
+    let driver_config = Arc::new(DriverConfig::new(
+        ws_endpoint,
+        dispute_game_factory,
+        l2_output_oracle,
+    ));
     tracing::info!(target: "op-challenger-cli", "Driver config created successfully.");
 
     // Connect to the websocket endpoint.
@@ -69,15 +74,30 @@ async fn main() -> Result<()> {
     let ws_endpoint = Arc::new(Provider::<Ws>::connect(driver_config.ws_endpoint.clone()).await?);
     tracing::info!(target: "op-challenger-cli", "Websocket connected successfully @ {}", &driver_config.ws_endpoint);
 
-    // Create the driver stack and start it.
-    driver_stack!(
+    // Creates a new driver stack and starts the driver loops.
+    // TODO: Extend to support a configurable driver stack.
+    macro_rules! start_driver_stack {
+        ($cfg:expr, $provider:expr, $($driver:ident),+ $(,)?) => {
+            let mut set = JoinSet::new();
+
+            $(set.spawn(
+                $driver::new($cfg.clone(), $provider.clone()).start_loop()
+            );)*
+
+            while let Some(result) = set.join_next().await {
+                result??;
+            }
+        }
+    }
+
+    // Start the driver stack
+    tracing::info!(target: "op-challenger-cli", "Starting driver stack...");
+    start_driver_stack!(
         driver_config,
         ws_endpoint,
-        DisputeDriver,
         OutputAttestationDriver,
-    )
-    .start_drivers()
-    .await?;
+        DisputeDriver,
+    );
 
     Ok(())
 }

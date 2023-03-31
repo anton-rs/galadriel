@@ -5,127 +5,85 @@ use crate::{
     Driver, DriverConfig,
 };
 use anyhow::Result;
-use ethers::providers::{self, Middleware, Provider, StreamExt, Ws};
-use std::{future::Future, pin::Pin, sync::Arc};
+use async_trait::async_trait;
+use ethers::providers::{Middleware, StreamExt};
+use ethers::providers::{Provider, Ws};
+use std::sync::Arc;
 
-#[derive(Default)]
-pub struct DriverStack {
-    pub drivers: Vec<Box<dyn Driver>>,
-}
-
-impl DriverStack {
-    /// Creates a new [DriverStack].
-    pub fn new(drivers: Vec<Box<dyn Driver>>) -> Self {
-        Self { drivers }
-    }
-
-    /// Consumes the [DriverStack] and starts all contained [Driver]s in parallel.
-    pub async fn start_drivers(self) -> Result<()> {
-        for handle in self
-            .drivers
-            .into_iter()
-            .map(|d| tokio::task::spawn(async move { d.pin_future().await }))
-            .collect::<Vec<_>>()
-        {
-            handle.await??;
-        }
-        Ok(())
-    }
-}
-
-/// Creates a new [DriverStack] with the given drivers.
+/// Defines a new [Driver] implementation.
 #[macro_export]
-macro_rules! driver_stack {
-    ($cfg:expr, $provider:expr, $($driver:ident),+ $(,)?) => {
-        {
-            let drivers: Vec<Box<dyn Driver>> = vec![
-                $(Box::new($driver::new($cfg.clone(), $provider.clone()))),+
-            ];
-            $crate::drivers::DriverStack::new(drivers)
+macro_rules! define_driver {
+    ($name:ident, $inner:expr) => {
+        #[doc = concat!("Variant of the [Driver] trait: [", stringify!($name), "]")]
+        pub struct $name {
+            /// The configuration for all of the drivers.
+            pub config: Arc<DriverConfig>,
+            /// The provider used to index and send transactions by all drivers.
+            pub(crate) provider: Arc<Provider<Ws>>,
+        }
+
+        #[async_trait]
+        impl Driver for $name {
+            async fn start_loop(self) -> Result<()> {
+                $inner(self).await
+            }
+        }
+
+        impl $name {
+            /// Creates a new [$name] with the given configuration.
+            pub fn new(config: Arc<DriverConfig>, provider: Arc<Provider<Ws>>) -> Self {
+                Self { config, provider }
+            }
         }
     };
 }
 
-/// The [DisputeDriver] maintains the state loop for the dispute challenge agent.
-pub struct DisputeDriver {
-    /// The configuration for the driver.
-    pub config: DriverConfig,
-    /// The provider used to index and send transactions.
-    pub(crate) provider: Arc<Provider<Ws>>,
-}
+define_driver!(
+    DisputeDriver,
+    (|self: DisputeDriver| {
+        async move {
+            tracing::info!("Subscribing to DisputeGameCreated events...");
 
-impl Driver for DisputeDriver {
-    /// Returns the [Future] that starts the driver loop when awaited.
-    fn pin_future(&self) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>> {
-        Box::pin(self.start_loop())
-    }
-}
+            let factory = DisputeGame_Factory::new(
+                self.config.dispute_game_factory,
+                Arc::clone(&self.provider),
+            );
+            let mut stream = self
+                .provider
+                .subscribe_logs(&factory.dispute_game_created_filter().filter)
+                .await?;
 
-impl DisputeDriver {
-    /// Creates a new [Driver] with the given configuration.
-    pub fn new(config: DriverConfig, provider: Arc<Provider<providers::Ws>>) -> Self {
-        Self { config, provider }
-    }
+            tracing::info!("Subscribed to DisputeGameCreated events, beginning event loop.");
+            while let Some(output_proposed) = stream.next().await {
+                tracing::debug!(target: "op-challenger-driver", "DisputeGameCreated event received");
+                println!("{:?}", output_proposed);
+            }
 
-    /// Starts the [DisputeDriver] loop.
-    async fn start_loop(&self) -> Result<()> {
-        tracing::info!("Subscribing to DisputeGameCreated events...");
-
-        let factory =
-            DisputeGame_Factory::new(self.config.dispute_game_factory, Arc::clone(&self.provider));
-        let mut stream = self
-            .provider
-            .subscribe_logs(&factory.dispute_game_created_filter().filter)
-            .await?;
-
-        tracing::info!("Subscribed to DisputeGameCreated events, beginning event loop.");
-        while let Some(output_proposed) = stream.next().await {
-            tracing::debug!(target: "op-challenger-driver", "DisputeGameCreated event received");
-            println!("{:?}", output_proposed);
+            Ok(())
         }
+    })
+);
 
-        Ok(())
-    }
-}
+define_driver!(
+    OutputAttestationDriver,
+    (|self: OutputAttestationDriver| {
+        async move {
+            tracing::info!("Subscribing to OutputProposed events...");
 
-/// The [OutputAttestationDriver] maintains the state loop for the output attestation challenge
-/// agent.
-pub struct OutputAttestationDriver {
-    /// The configuration for the driver.
-    pub config: DriverConfig,
-    /// The provider used to index and send transactions.
-    pub(crate) provider: Arc<Provider<providers::Ws>>,
-}
+            let oracle =
+                L2OutputOracle::new(self.config.l2_output_oracle, Arc::clone(&self.provider));
+            let mut stream = self
+                .provider
+                .subscribe_logs(&oracle.output_proposed_filter().filter)
+                .await?;
 
-impl Driver for OutputAttestationDriver {
-    /// Returns the [Future] that starts the driver loop when awaited.
-    fn pin_future(&self) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>> {
-        Box::pin(self.start_loop())
-    }
-}
+            tracing::info!("Subscribed to OutputProposed events, beginning event loop.");
+            while let Some(output_proposed) = stream.next().await {
+                tracing::debug!(target: "op-challenger-driver", "OutputProposed event received");
+                println!("{:?}", output_proposed);
+            }
 
-impl OutputAttestationDriver {
-    /// Creates a new [Driver] with the given configuration.
-    pub fn new(config: DriverConfig, provider: Arc<Provider<providers::Ws>>) -> Self {
-        Self { config, provider }
-    }
-
-    /// Starts the [OutputAttestationDriver] loop.
-    async fn start_loop(&self) -> Result<()> {
-        tracing::info!("Subscribing to OutputProposed events...");
-
-        let factory = L2OutputOracle::new(self.config.l2_output_oracle, Arc::clone(&self.provider));
-        let mut stream = self
-            .provider
-            .subscribe_logs(&factory.output_proposed_filter().filter)
-            .await?;
-
-        tracing::info!("Subscribed to OutputProposed events, beginning event loop.");
-        while let Some(output_proposed) = stream.next().await {
-            tracing::debug!(target: "op-challenger-driver", "OutputProposed event received");
-            println!("{:?}", output_proposed);
+            Ok(())
         }
-
-        Ok(())
-    }
-}
+    })
+);

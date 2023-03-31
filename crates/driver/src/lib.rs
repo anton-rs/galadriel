@@ -2,14 +2,15 @@
 
 use crate::config::DriverConfig;
 use anyhow::Result;
-use std::{future::Future, pin::Pin};
+use async_trait::async_trait;
 
 mod abi;
 pub mod config;
 pub mod drivers;
 
 /// The [Driver] trait defines the interface for all driver loops that are ran by the `op-challenger` binary.
+#[async_trait]
 pub trait Driver: Send + Sync {
-    /// Returns the [Future] that starts the driver loop when awaited.
-    fn pin_future(&self) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>>;
+    /// Consumes the [Driver] and starts the event loop.
+    async fn start_loop(self) -> Result<()>;
 }
