@@ -1,9 +1,14 @@
 #![doc = include_str!("../README.md")]
 
+use std::sync::Arc;
+
 use anyhow::{anyhow, Result};
 use clap::{ArgAction, Parser};
+use ethers::providers::{Provider, Ws};
 use ethers::types::Address;
-use op_challenger_driver::{Driver, DriverConfig, OutputAttestationDriver};
+use op_challenger_driver::config::DriverConfig;
+use op_challenger_driver::drivers::{DisputeDriver, OutputAttestationDriver};
+use op_challenger_driver::{driver_stack, Driver};
 use tracing::Level;
 
 /// Arguments for the `op-challenger` binary.
@@ -59,13 +64,20 @@ async fn main() -> Result<()> {
     let driver_config = DriverConfig::new(ws_endpoint, dispute_game_factory, l2_output_oracle);
     tracing::info!(target: "op-challenger-cli", "Driver config created successfully.");
 
-    // Create the driver and connect to the websocket endpoint.
-    tracing::debug!(target: "op-challenger-cli", "Creating driver and connecting to websocket endpoint...");
-    let driver = OutputAttestationDriver::try_new(driver_config).await?;
-    tracing::info!(target: "op-challenger-cli", "Driver created successfully, websocket connected @ {}", &driver.config.ws_endpoint);
+    // Connect to the websocket endpoint.
+    tracing::debug!(target: "op-challenger-cli", "Connecting to websocket endpoint...");
+    let ws_endpoint = Arc::new(Provider::<Ws>::connect(driver_config.ws_endpoint.clone()).await?);
+    tracing::info!(target: "op-challenger-cli", "Websocket connected successfully @ {}", &driver_config.ws_endpoint);
 
-    // Start the driver loop.
-    driver.start().await?;
+    // Create the driver stack and start it.
+    driver_stack!(
+        driver_config,
+        ws_endpoint,
+        DisputeDriver,
+        OutputAttestationDriver,
+    )
+    .start_drivers()
+    .await?;
 
     Ok(())
 }
