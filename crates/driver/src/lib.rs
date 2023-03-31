@@ -1,12 +1,18 @@
 #![doc = include_str!("../README.md")]
 
-use crate::config::DriverConfig;
 use anyhow::Result;
 use async_trait::async_trait;
 
 mod abi;
-pub mod config;
-pub mod drivers;
+
+mod config;
+pub use config::DriverConfig;
+
+mod drivers;
+pub use drivers::*;
+
+mod types;
+pub use types::*;
 
 /// The [Driver] trait defines the interface for all driver loops that are ran by the `op-challenger` binary.
 #[async_trait]

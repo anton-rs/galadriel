@@ -1,15 +1,8 @@
 //! The `config` module contains the [DriverConfig].
 
-use ethers::{
-    prelude::{k256::ecdsa::SigningKey, ContractCall, SignerMiddleware},
-    providers::{Provider, Ws},
-    signers::Wallet,
-    types::Address,
-};
+use crate::types::PreparedCall;
+use ethers::types::Address;
 use tokio::sync::{mpsc, Mutex};
-
-/// The [PreparedCall] type is a [ContractCall] that uses the [SignerMiddleware] to sign transactions.
-type PreparedCall = ContractCall<SignerMiddleware<Provider<Ws>, Wallet<SigningKey>>, Address>;
 
 /// The [DriverConfig] struct contains the configuration for the [Driver].
 #[derive(Debug)]

@@ -4,9 +4,7 @@ use anyhow::{anyhow, Result};
 use clap::{ArgAction, Parser};
 use ethers::prelude::{Address, Provider, SignerMiddleware, Ws};
 use op_challenger_driver::{
-    config::DriverConfig,
-    drivers::{DisputeDriver, OutputAttestationDriver, TxDispatchDriver},
-    Driver,
+    DisputeFactoryDriver, Driver, DriverConfig, OutputAttestationDriver, TxDispatchDriver,
 };
 use std::sync::Arc;
 use tokio::task::JoinSet;
@@ -109,8 +107,8 @@ async fn main() -> Result<()> {
         driver_config,
         ws_endpoint,
         TxDispatchDriver,
+        DisputeFactoryDriver,
         OutputAttestationDriver,
-        DisputeDriver,
     );
 
     Ok(())
