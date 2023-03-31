@@ -25,6 +25,7 @@ macro_rules! define_driver {
         #[async_trait]
         impl Driver for $name {
             async fn start_loop(self) -> Result<()> {
+                #[allow(clippy::redundant_closure_call)]
                 $inner(self).await
             }
         }
@@ -37,6 +38,32 @@ macro_rules! define_driver {
         }
     };
 }
+
+define_driver!(
+    TxDispatchDriver,
+    (|self: TxDispatchDriver| {
+        async move {
+            tracing::info!(target: "op-challenger-driver", "Starting transaction dispatch driver...");
+            let mut locked_receive_ch = self.config.tx_receiver.lock().await;
+            tracing::info!(target: "op-challenger-driver", "Locked receive channel mutex successfully. Beginning tx dispatch loop.");
+
+            while let Some(payload) = locked_receive_ch.recv().await {
+                tracing::info!(target: "op-challenger-driver", "Signed payload received in dispatch driver. Sending transaction...");
+                match self.provider.send_raw_transaction(payload).await {
+                    Ok(res) => {
+                        tracing::info!(target: "op-challenger-driver", "Transaction sent successfully. Tx hash: {}", res.tx_hash());
+                    }
+                    Err(e) => {
+                        // Soft failure, log the error and continue.
+                        tracing::error!(target: "op-challenger-driver", "Error sending transaction: {}", e);
+                    }
+                }
+            }
+
+            Ok(())
+        }
+    })
+);
 
 define_driver!(
     DisputeDriver,

@@ -1,14 +1,15 @@
 #![doc = include_str!("../README.md")]
 
-use std::sync::Arc;
-
 use anyhow::{anyhow, Result};
 use clap::{ArgAction, Parser};
 use ethers::providers::{Provider, Ws};
 use ethers::types::Address;
-use op_challenger_driver::config::DriverConfig;
-use op_challenger_driver::drivers::{DisputeDriver, OutputAttestationDriver};
-use op_challenger_driver::Driver;
+use op_challenger_driver::{
+    config::DriverConfig,
+    drivers::{DisputeDriver, OutputAttestationDriver, TxDispatchDriver},
+    Driver,
+};
+use std::sync::Arc;
 use tokio::task::JoinSet;
 use tracing::Level;
 
@@ -95,6 +96,7 @@ async fn main() -> Result<()> {
     start_driver_stack!(
         driver_config,
         ws_endpoint,
+        TxDispatchDriver,
         OutputAttestationDriver,
         DisputeDriver,
     );
