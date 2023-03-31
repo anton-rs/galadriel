@@ -2,7 +2,10 @@
 
 use anyhow::{anyhow, Result};
 use clap::{ArgAction, Parser};
-use ethers::prelude::{Address, Provider, SignerMiddleware, Ws};
+use ethers::{
+    prelude::{Address, Provider, SignerMiddleware, Ws},
+    providers::Http,
+};
 use op_challenger_driver::{
     DisputeFactoryDriver, Driver, DriverConfig, OutputAttestationDriver, TxDispatchDriver,
 };
@@ -21,16 +24,24 @@ struct Args {
     /// The Websocket RPC endpoint used to index and send transactions.
     #[arg(
         long,
-        short,
         help = "The Websocket RPC endpoint used to index and send transactions.",
-        env = "OP_CHALLENGER_WS"
+        env = "OP_CHALLENGER_L1_WS"
     )]
-    ws_endpoint: String,
+    l1_ws_endpoint: String,
+
+    /// The HTTP RPC endpoint used to compare proposed outputs against.
+    /// This RPC should be 100% trusted- the bot will use this endpoint as the source of truth
+    /// for the L2 chain in output attestation games.
+    #[arg(
+        long,
+        help = "The HTTP RPC endpoint used to compare proposed outputs against.",
+        env = "OP_CHALLENGER_TRUSTED_OP_NODE_RPC"
+    )]
+    trusted_op_node_endpoint: String,
 
     /// The private key used for signing transactions.
     #[arg(
         long,
-        short,
         help = "The private key used for signing transactions.",
         env = "OP_CHALLENGER_KEY"
     )]
@@ -39,7 +50,6 @@ struct Args {
     /// The address of the dispute game factory contract.
     #[arg(
         long,
-        short,
         help = "The address of the dispute game factory contract.",
         env = "OP_CHALLENGER_DGF"
     )]
@@ -48,7 +58,6 @@ struct Args {
     /// The address of the L2OutputOracle contract.
     #[arg(
         long,
-        short,
         help = "The address of the L2OutputOracle contract.",
         env = "OP_CHALLENGER_L2OO"
     )]
@@ -60,7 +69,8 @@ async fn main() -> Result<()> {
     // Parse the command arguments
     let Args {
         v,
-        ws_endpoint,
+        l1_ws_endpoint,
+        trusted_op_node_endpoint,
         signer_key,
         dispute_game_factory,
         l2_output_oracle,
@@ -71,7 +81,8 @@ async fn main() -> Result<()> {
 
     // Create the driver config.
     let driver_config = Arc::new(DriverConfig::new(
-        ws_endpoint,
+        l1_ws_endpoint,
+        trusted_op_node_endpoint,
         dispute_game_factory,
         l2_output_oracle,
     ));
@@ -80,19 +91,26 @@ async fn main() -> Result<()> {
     // Connect to the websocket endpoint.
     tracing::debug!(target: "op-challenger-cli", "Connecting to websocket endpoint...");
     let ws_endpoint = Arc::new(SignerMiddleware::new(
-        Provider::<Ws>::connect(driver_config.ws_endpoint.clone()).await?,
+        Provider::<Ws>::connect(driver_config.l1_ws_endpoint.clone()).await?,
         signer_key.parse()?,
     ));
-    tracing::info!(target: "op-challenger-cli", "Websocket connected successfully @ {}", &driver_config.ws_endpoint);
+    tracing::info!(target: "op-challenger-cli", "Websocket connected successfully @ {}", &driver_config.l1_ws_endpoint);
+
+    // Connect to the node endpoint.
+    tracing::debug!(target: "op-challenger-cli", "Connecting to node endpoint...");
+    let node_endpoint = Arc::new(Provider::<Http>::try_from(
+        driver_config.trusted_op_node_endpoint.clone(),
+    )?);
+    tracing::info!(target: "op-challenger-cli", "Node connected successfully @ {}", &driver_config.trusted_op_node_endpoint);
 
     // Creates a new driver stack and starts the driver loops.
     // TODO: Extend to support a configurable driver stack.
     macro_rules! start_driver_stack {
-        ($cfg:expr, $provider:expr, $($driver:ident),+ $(,)?) => {
+        ($cfg:expr, $l1_provider:expr, $node_provider:expr, $($driver:ident),+ $(,)?) => {
             let mut set = JoinSet::new();
 
             $(set.spawn(
-                $driver::new($cfg.clone(), $provider.clone()).start_loop()
+                $driver::new(Arc::clone(&$cfg), Arc::clone(&$l1_provider), Arc::clone(&$node_provider)).start_loop()
             );)*
 
             while let Some(result) = set.join_next().await {
@@ -106,6 +124,7 @@ async fn main() -> Result<()> {
     start_driver_stack!(
         driver_config,
         ws_endpoint,
+        node_endpoint,
         TxDispatchDriver,
         DisputeFactoryDriver,
         OutputAttestationDriver,

@@ -1,5 +1,8 @@
 # MacOS
 .DS_Store
 
+# ENV
+.env
+
 # Rust
 /target
