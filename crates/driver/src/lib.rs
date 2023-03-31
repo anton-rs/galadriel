@@ -1,4 +1,4 @@
-//! op-challenger-driver
+#![doc = include_str!("../README.md")]
 
 use crate::abi::L2OutputOracle;
 use abi::DisputeGame_Factory;

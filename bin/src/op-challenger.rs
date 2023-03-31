@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 use anyhow::{anyhow, Result};
 use clap::{ArgAction, Parser};
 use ethers::types::Address;
