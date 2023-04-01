@@ -13,11 +13,10 @@ To work in this repo, you'll need to install:
 ```sh
 git clone git@github.com:clabby/op-challenger.git
 ```
-2. Configure your environment
+2. Start the devnet.
 ```sh
-cp .env.devnet .env
-nvim .env
-source .env
+nvim ./start_devnet.sh # edit MONOREPO_DIR accordingly
+./start_devnet.sh
 ```
 3. Start the `op-challenger` with information, warning, and error traces enabled.
 ```sh

@@ -13,7 +13,10 @@ MONOREPO_DIR="$HOME/dev/optimism/monorepo"
 (cd ./testdata/mock-dgf && forge script script/DeployMocks.s.sol --rpc-url http://localhost:8545 --private-key $OP_CHALLENGER_KEY --broadcast)
 
 echo "----------------------------------------------------------------"
-echo " - Paste the environment variable logged by the forge script"
-echo " - into the \`.env.devnet\` file and then source it again before"
-echo " - running the \`op-challenger\`."
+echo "                     Devnet is up and running                   " 
+echo " - L1 RPC: http://localost:8545"
+echo " - L2 WS: ws://localost:8546"
+echo " - L2 RPC: http://localost:9545"
+echo " - OP Node RPC: http://localost:7545"
+echo " - Dispute game factory: $OP_CHALLENGER_DGF"
 echo "----------------------------------------------------------------"
