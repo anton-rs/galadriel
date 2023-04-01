@@ -3,7 +3,7 @@
 use anyhow::{anyhow, Result};
 use clap::{ArgAction, Parser};
 use ethers::{
-    prelude::{Address, Provider, SignerMiddleware, Ws},
+    prelude::{Address, MiddlewareBuilder, Provider, Ws},
     providers::Http,
 };
 use op_challenger_driver::{
@@ -90,10 +90,11 @@ async fn main() -> Result<()> {
 
     // Connect to the websocket endpoint.
     tracing::debug!(target: "op-challenger-cli", "Connecting to websocket endpoint...");
-    let ws_endpoint = Arc::new(SignerMiddleware::new(
-        Provider::<Ws>::connect(driver_config.l1_ws_endpoint.clone()).await?,
-        signer_key.parse()?,
-    ));
+    let ws_endpoint = Arc::new(
+        Provider::<Ws>::connect(driver_config.l1_ws_endpoint.clone())
+            .await?
+            .with_signer(signer_key.parse()?),
+    );
     tracing::info!(target: "op-challenger-cli", "Websocket connected successfully @ {}", &driver_config.l1_ws_endpoint);
 
     // Connect to the node endpoint.
