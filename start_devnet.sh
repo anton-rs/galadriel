@@ -5,15 +5,35 @@ source .env.devnet
 
 # Change accordingly
 MONOREPO_DIR="$HOME/dev/optimism/monorepo"
+# MONOREPO_DIR="$HOME/optimism/optimism"
 
 # Boot up the devnet
-(cd $MONOREPO_DIR && make devnet-down && make devnet-up)
+(cd $MONOREPO_DIR && make devnet-down && L2OO_ADDRESS="0x6900000000000000000000000000000000000000" make devnet-up)
+
+# Fetching balance of the sponsor
+echo "----------------------------------------------------------------"
+echo " - Fetching balance of the sponsor"
+cast balance 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --rpc-url http://localhost:8545
+echo "----------------------------------------------------------------"
+
+# Send some ETH to the deployer
+echo "----------------------------------------------------------------"
+echo " - Sending some ETH to the deployer"
+cast send --rpc-url http://localhost:8545 --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 0xAF00b1C8A848BE9aFb28860BA0dC27b02fE3BD4d --value 1000000000000000000
+echo "----------------------------------------------------------------"
 
 # Deploy the mock dispute game contract
+echo "----------------------------------------------------------------"
+echo " - Deploying the mock dispute game contract"
 (cd ./testdata/mock-dgf && forge script script/DeployMocks.s.sol --rpc-url http://localhost:8545 --private-key $OP_CHALLENGER_KEY --broadcast)
+echo "----------------------------------------------------------------"
+
+# echo "----------------------------------------------------------------"
+# echo " - Paste the environment variable logged by the forge script"
+# echo " - into the \`.env.devnet\` file and then source it again before"
+# echo " - running the \`op-challenger\`."
+# echo "----------------------------------------------------------------"
 
 echo "----------------------------------------------------------------"
-echo " - Paste the environment variable logged by the forge script"
-echo " - into the \`.env.devnet\` file and then source it again before"
-echo " - running the \`op-challenger\`."
+echo " All done! You can now run the \`op-challenger\`."
 echo "----------------------------------------------------------------"
