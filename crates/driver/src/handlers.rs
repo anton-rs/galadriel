@@ -1,5 +1,5 @@
 use crate::{
-    abi::{DisputeGame_Factory, DisputeGame_OutputAttestation},
+    bindings::{DisputeGame_Factory, DisputeGame_OutputAttestation},
     utils, DriverConfig, GameType, SignerMiddlewareWS,
 };
 use anyhow::Result;

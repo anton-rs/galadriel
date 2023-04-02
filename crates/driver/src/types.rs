@@ -11,7 +11,6 @@ pub type SignerMiddlewareWS = SignerMiddleware<Provider<Ws>, LocalWallet>;
 
 /// The [GameType] enum defines the different types of [DisputeGames] with cloneable
 /// implementations in the [DisputeGame_Factory] contract.
-#[allow(dead_code)]
 #[repr(u8)]
 pub enum GameType {
     Fault = 0,

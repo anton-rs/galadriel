@@ -1,7 +1,7 @@
 //! The `driver` module contains implementations of the [Driver] trait.
 
 use crate::{
-    abi::{DisputeGame_Factory, L2OutputOracle},
+    bindings::{DisputeGame_Factory, L2OutputOracle},
     handlers,
     types::GameType,
     Driver, DriverConfig,

@@ -3,7 +3,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-mod abi;
+mod bindings;
 
 mod config;
 pub use config::DriverConfig;
