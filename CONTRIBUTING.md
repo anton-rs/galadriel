@@ -6,6 +6,9 @@ Thanks for wanting to contribute! :yellow_heart:
 
 To work in this repo, you'll need to install:
 1. [Rust Toolchain](https://rustup.rs/)
+1. [Docker](https://docs.docker.com/get-docker/)
+
+And clone the [Optimism Monorepo](https://github.com/ethereum-optimism/optimism)
 
 ## Getting Started
 
