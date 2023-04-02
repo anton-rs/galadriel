@@ -1,12 +1,13 @@
 use ethers::{
-    prelude::{k256::ecdsa::SigningKey, ContractCall, SignerMiddleware},
+    prelude::SignerMiddleware,
     providers::{Provider, Ws},
-    signers::Wallet,
-    types::Address,
+    signers::LocalWallet,
+    types::H256,
 };
+use serde::{Deserialize, Serialize};
 
-/// The [PreparedCall] type is a [ContractCall] that uses the [SignerMiddleware] to sign transactions.
-pub type PreparedCall = ContractCall<SignerMiddleware<Provider<Ws>, Wallet<SigningKey>>, Address>;
+/// The [SignerMiddlewareWS] type is a [SignerMiddleware] that uses a [Provider] with a [Ws] transport.
+pub type SignerMiddlewareWS = SignerMiddleware<Provider<Ws>, LocalWallet>;
 
 /// The [GameType] enum defines the different types of [DisputeGames] with cloneable
 /// implementations in the [DisputeGame_Factory] contract.
@@ -29,4 +30,10 @@ impl TryFrom<u8> for GameType {
             _ => Err(anyhow::anyhow!("Invalid game type")),
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OutputAtBlockResponse {
+    pub output_root: H256,
 }

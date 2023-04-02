@@ -11,8 +11,12 @@ pub use config::DriverConfig;
 mod drivers;
 pub use drivers::*;
 
+mod handlers;
+
 mod types;
 pub use types::*;
+
+mod utils;
 
 /// The [Driver] trait defines the interface for all driver loops that are ran by the `op-challenger` binary.
 #[async_trait]

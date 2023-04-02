@@ -2,25 +2,17 @@
 
 use crate::{
     abi::{DisputeGame_Factory, L2OutputOracle},
+    handlers,
     types::GameType,
-    Driver, DriverConfig,
+    utils, Driver, DriverConfig,
 };
 use anyhow::Result;
 use async_trait::async_trait;
+use ethers::types::H256;
 use ethers::{
-    core::k256::ecdsa::SigningKey,
     providers::{Middleware, StreamExt},
-    types::{Bytes, Transaction, U256},
+    types::{Address, Bytes, Transaction, U256},
 };
-use ethers::{
-    prelude::{SignerMiddleware, Wallet},
-    providers::Http,
-};
-use ethers::{
-    providers::{Provider, Ws},
-    types::H256,
-};
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 /// Defines a new [Driver] implementation.
@@ -32,12 +24,6 @@ macro_rules! define_driver {
         pub struct $name {
             /// The configuration for all of the drivers.
             pub config: Arc<DriverConfig>,
-            /// The websocket endpoint of the RPC used to index events and send transactions on L1.
-            pub(crate) l1_provider: Arc<SignerMiddleware<Provider<Ws>, Wallet<SigningKey>>>,
-            /// The HTTP endpoint of the trusted RPC used to compare proposed outputs against.
-            /// This RPC should be 100% trusted- the bot will use this endpoint as the source of truth
-            /// for the L2 chain in output attestation games.
-            pub(crate) node_provider: Arc<Provider<Http>>,
         }
 
         #[async_trait]
@@ -50,16 +36,8 @@ macro_rules! define_driver {
 
         impl $name {
             #[doc = concat!("Creates a new instance of the [", stringify!($name), "] driver.")]
-            pub fn new(
-                config: Arc<DriverConfig>,
-                l1_provider: Arc<SignerMiddleware<Provider<Ws>, Wallet<SigningKey>>>,
-                node_provider: Arc<Provider<Http>>,
-            ) -> Self {
-                Self {
-                    config,
-                    l1_provider,
-                    node_provider,
-                }
+            pub fn new(config: Arc<DriverConfig>) -> Self {
+                Self { config }
             }
         }
     };
@@ -75,7 +53,7 @@ define_driver!(
 
             while let Some(tx) = locked_receive_ch.recv().await {
                 tracing::info!(target: "tx-dispatch-driver", "Signed transaction request received in dispatch driver. Sending transaction...");
-                match tx.send().await {
+                match self.config.l1_provider.send_transaction(tx, None).await {
                     Ok(res) => {
                         tracing::info!(target: "tx-dispatch-driver", "Transaction sent successfully. Tx hash: {}", res.tx_hash());
                     }
@@ -99,9 +77,10 @@ define_driver!(
 
             let factory = DisputeGame_Factory::new(
                 self.config.dispute_game_factory,
-                Arc::clone(&self.l1_provider),
+                Arc::clone(&self.config.l1_provider),
             );
             let mut stream = self
+                .config
                 .l1_provider
                 .subscribe_logs(&factory.dispute_game_created_filter().filter)
                 .await?;
@@ -111,12 +90,16 @@ define_driver!(
                 tracing::debug!(target: "dispute-factory-driver", "DisputeGameCreated event received");
 
                 // The DisputeGameCreated event contains a `gameType` field, which is a `GameType`.
-                let game_type_raw = dispute_game_created.topics.get(1).ok_or(anyhow::anyhow!(
+                let game_type_raw = dispute_game_created.topics.get(2).ok_or(anyhow::anyhow!(
                     "Critical failure: `gameType` field not present in `DisputeGameCreated` event."
                 ))?;
                 // A [GameType] will always be a u8, so we can safely index the last byte in the
                 // topic.
                 let game_type_u8 = game_type_raw[31];
+                // The address of the created dispute game proxy.
+                let game_addr: Address = Address::from_slice(&dispute_game_created.topics.get(1).ok_or(anyhow::anyhow!(
+                    "Critical failure: `disputeProxy` field not present in `DisputeGameCreated` event."
+                ))?[12..]);
 
                 // Attempt to dispatch the proper response based on the game type.
                 if let Ok(game_type) = GameType::try_from(game_type_u8) {
@@ -128,9 +111,12 @@ define_driver!(
                             tracing::error!(target: "dispute-factory-driver", "DisputeGameCreated event contained a `Validity` game type, which is not yet supported");
                         }
                         GameType::OutputAttestation => {
-                            // TODO: If the dispute game type is `OutputAttestation`, check the `rootClaim`
-                            // to see if we disagree with it. If we do, provide a signed message of the
-                            // `rootClaim` to the `challenge` function on the dispute game contract.
+                            tracing::info!("DisputeGameCreated event contained an `OutputAttestation` game type, which is supported. Checking for disagreement with the root claim...");
+                            handlers::output_attestation_game_created(
+                                Arc::clone(&self.config),
+                                game_addr,
+                            )
+                            .await?;
                         }
                     }
                 } else {
@@ -139,7 +125,7 @@ define_driver!(
                 }
 
                 // TODO: Track the dispute game contract address and the dispute game type in a
-                // local database.
+                // local database for games that require multiple responses.
 
                 dbg!(dispute_game_created);
             }
@@ -149,24 +135,21 @@ define_driver!(
     })
 );
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct OutputAtBlockResponse {
-    output_root: H256,
-}
-
 define_driver!(
     OutputAttestationDriver,
     (|self: OutputAttestationDriver| {
         async move {
             tracing::info!(target: "output-attestation-driver", "Subscribing to OutputProposed events...");
-            let oracle =
-                L2OutputOracle::new(self.config.l2_output_oracle, Arc::clone(&self.l1_provider));
+            let oracle = L2OutputOracle::new(
+                self.config.l2_output_oracle,
+                Arc::clone(&self.config.l1_provider),
+            );
             let factory = DisputeGame_Factory::new(
                 self.config.dispute_game_factory,
-                Arc::clone(&self.l1_provider),
+                Arc::clone(&self.config.l1_provider),
             );
             let mut stream = self
+                .config
                 .l1_provider
                 .subscribe_logs(&oracle.output_proposed_filter().filter)
                 .await?;
@@ -175,6 +158,9 @@ define_driver!(
             while let Some(output_proposed) = stream.next().await {
                 tracing::debug!(target: "output-attestation-driver", "OutputProposed event received");
 
+                let proposed_root = output_proposed.topics.get(1).ok_or(anyhow::anyhow!(
+                    "Critical failure: Output Root topic not present in `OutputProposed` event."
+                ))?;
                 // Convert the H256 representing the l2 block number into a u64.
                 let proposed_block = &output_proposed
                     .topics
@@ -182,28 +168,26 @@ define_driver!(
                     .ok_or(anyhow::anyhow!("Critical failure: L2 Block Number topic not present in `OutputProposed` event."))?
                     .to_low_u64_be();
 
-                match self
-                    .node_provider
-                    .request::<Vec<String>, OutputAtBlockResponse>(
-                        "optimism_outputAtBlock",
-                        vec![format!("0x{:x}", proposed_block)],
-                    )
-                    .await
-                {
-                    Ok(output_at_block) => {
-                        let proposed_root = output_proposed
-                            .topics
-                            .get(1)
-                            .ok_or(anyhow::anyhow!("Critical failure: Output Root topic not present in `OutputProposed` event."))?;
+                // TODO: Break out below logic into handler module
 
+                match utils::compare_output_root(
+                    Arc::clone(&self.config.node_provider),
+                    proposed_root,
+                    *proposed_block,
+                )
+                .await
+                {
+                    Ok((matches, output_at_block)) => {
                         // Compare the output root proposed to L1 to the output root given to us by
                         // our trusted RPC.
-                        if proposed_root != &output_at_block.output_root {
+                        if matches {
+                            tracing::debug!(target: "output-attestation-driver", "Output proposed on L1 for L2 block #{} matches output at block on trusted L2 RPC.", proposed_block);
+                        } else {
                             tracing::warn!(target: "output-attestation-driver", "Output proposed by L1 does not match output at block on L2. L1: {:?}, L2: {:?}", proposed_root, output_at_block.output_root);
 
                             // Check to see if someone has already challenged this output proposal.
                             tracing::debug!(target: "output-attestation-driver", "Checking to see if a challenge has already been submitted to L1 for the disagreed upon output...");
-                            let tx_pool_content = self.l1_provider.txpool_content().await?;
+                            let tx_pool_content = self.config.l1_provider.txpool_content().await?;
                             let is_pending_challenge =
                                 // Only check pending transactions that are about to be included.
                                 tx_pool_content.pending.values().any(|txs| {
@@ -229,15 +213,17 @@ define_driver!(
                                 // Send a challenge creation transaction to the L1 dispute game factory.
                                 self.config
                                     .tx_sender
-                                    .send(factory.create(
-                                        GameType::OutputAttestation as u8,
-                                        proposed_root.to_fixed_bytes(),
-                                        Bytes::new(), // TODO: We may want to include the l2 block number in the extra data.
-                                    ))
+                                    .send(
+                                        factory
+                                            .create(
+                                                GameType::OutputAttestation as u8,
+                                                proposed_root.to_fixed_bytes(),
+                                                Bytes::new(), // TODO: We may want to include the l2 block number in the extra data.
+                                            )
+                                            .tx,
+                                    )
                                     .await?;
                             }
-                        } else {
-                            tracing::debug!(target: "output-attestation-driver", "Output proposed on L1 for L2 block #{} matches output at block on trusted L2 RPC.", proposed_block);
                         }
                     }
                     Err(e) => {

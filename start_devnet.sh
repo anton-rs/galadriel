@@ -5,10 +5,13 @@ source .env.devnet
 
 # Change accordingly
 MONOREPO_DIR="$HOME/dev/optimism/monorepo"
-# MONOREPO_DIR="$HOME/optimism/optimism"
+
+# Pre-funded devnet account
+DEVNET_SPONSOR="ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
 # Boot up the devnet
-(cd $MONOREPO_DIR && make devnet-down && L2OO_ADDRESS="0x6900000000000000000000000000000000000000" make devnet-up)
+# Before booting, we make sure that we have a fresh devnet
+(cd $MONOREPO_DIR && make devnet-down && make devnet-clean && L2OO_ADDRESS="0x6900000000000000000000000000000000000000" make devnet-up)
 
 # Fetching balance of the sponsor
 echo "----------------------------------------------------------------"
@@ -19,7 +22,7 @@ echo "----------------------------------------------------------------"
 # Send some ETH to the deployer
 echo "----------------------------------------------------------------"
 echo " - Sending some ETH to the deployer"
-cast send --rpc-url http://localhost:8545 --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 0xAF00b1C8A848BE9aFb28860BA0dC27b02fE3BD4d --value 1000000000000000000
+cast send --rpc-url http://localhost:8545 --private-key $DEVNET_SPONSOR 0xAF00b1C8A848BE9aFb28860BA0dC27b02fE3BD4d --value 100000000000000000000
 echo "----------------------------------------------------------------"
 
 # Deploy the mock dispute game contract

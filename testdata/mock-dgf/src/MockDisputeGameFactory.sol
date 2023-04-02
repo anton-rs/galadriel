@@ -31,7 +31,7 @@ contract MockDisputeGameFactory {
     /// @param rootClaim The root claim of the DisputeGame.
     /// @param extraData Any extra data that should be provided to the created dispute game.
     function create(GameType gameType, Claim rootClaim, bytes calldata extraData) external returns (MockDisputeGame_OutputAttestation mock) {
-        mock = new MockDisputeGame_OutputAttestation();
+        mock = new MockDisputeGame_OutputAttestation(rootClaim, msg.sender);
         emit DisputeGameCreated(address(mock), gameType, rootClaim);
         extraData; // Unused
     }

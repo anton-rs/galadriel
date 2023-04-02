@@ -3,8 +3,9 @@
 use anyhow::{anyhow, Result};
 use clap::{ArgAction, Parser};
 use ethers::{
-    prelude::{Address, MiddlewareBuilder, Provider, Ws},
+    prelude::{Address, Provider, SignerMiddleware, Ws},
     providers::Http,
+    signers::LocalWallet,
 };
 use op_challenger_driver::{
     DisputeFactoryDriver, Driver, DriverConfig, OutputAttestationDriver, TxDispatchDriver,
@@ -79,39 +80,39 @@ async fn main() -> Result<()> {
     // Initialize the tracing subscriber
     init_tracing_subscriber(v)?;
 
+    // Connect to the websocket endpoint.
+    tracing::debug!(target: "op-challenger-cli", "Connecting to websocket endpoint...");
+    let l1_endpoint = Arc::new(
+        SignerMiddleware::new_with_provider_chain(
+            Provider::<Ws>::connect(&l1_ws_endpoint).await?,
+            signer_key.parse::<LocalWallet>()?,
+        )
+        .await?,
+    );
+    tracing::info!(target: "op-challenger-cli", "Websocket connected successfully @ {}", &l1_ws_endpoint);
+
+    // Connect to the node endpoint.
+    tracing::debug!(target: "op-challenger-cli", "Connecting to node endpoint...");
+    let node_endpoint = Arc::new(Provider::<Http>::try_from(&trusted_op_node_endpoint)?);
+    tracing::info!(target: "op-challenger-cli", "Node connected successfully @ {}", &trusted_op_node_endpoint);
+
     // Create the driver config.
     let driver_config = Arc::new(DriverConfig::new(
-        l1_ws_endpoint,
-        trusted_op_node_endpoint,
+        l1_endpoint,
+        node_endpoint,
         dispute_game_factory,
         l2_output_oracle,
     ));
     tracing::info!(target: "op-challenger-cli", "Driver config created successfully.");
 
-    // Connect to the websocket endpoint.
-    tracing::debug!(target: "op-challenger-cli", "Connecting to websocket endpoint...");
-    let ws_endpoint = Arc::new(
-        Provider::<Ws>::connect(driver_config.l1_ws_endpoint.clone())
-            .await?
-            .with_signer(signer_key.parse()?),
-    );
-    tracing::info!(target: "op-challenger-cli", "Websocket connected successfully @ {}", &driver_config.l1_ws_endpoint);
-
-    // Connect to the node endpoint.
-    tracing::debug!(target: "op-challenger-cli", "Connecting to node endpoint...");
-    let node_endpoint = Arc::new(Provider::<Http>::try_from(
-        driver_config.trusted_op_node_endpoint.clone(),
-    )?);
-    tracing::info!(target: "op-challenger-cli", "Node connected successfully @ {}", &driver_config.trusted_op_node_endpoint);
-
     // Creates a new driver stack and starts the driver loops.
     // TODO: Extend to support a configurable driver stack.
     macro_rules! start_driver_stack {
-        ($cfg:expr, $l1_provider:expr, $node_provider:expr, $($driver:ident),+ $(,)?) => {
+        ($cfg:expr, $($driver:ident),+ $(,)?) => {
             let mut set = JoinSet::new();
 
             $(set.spawn(
-                $driver::new(Arc::clone(&$cfg), Arc::clone(&$l1_provider), Arc::clone(&$node_provider)).start_loop()
+                $driver::new(Arc::clone(&$cfg)).start_loop()
             );)*
 
             while let Some(result) = set.join_next().await {
@@ -124,8 +125,6 @@ async fn main() -> Result<()> {
     tracing::info!(target: "op-challenger-cli", "Starting driver stack...");
     start_driver_stack!(
         driver_config,
-        ws_endpoint,
-        node_endpoint,
         TxDispatchDriver,
         DisputeFactoryDriver,
         OutputAttestationDriver,
