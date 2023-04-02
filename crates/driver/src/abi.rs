@@ -21,7 +21,8 @@ abigen!(
 abigen!(
     DisputeGame_OutputAttestation,
     r"[
-        function rootClaim() external view returns (bytes32)
+        function ROOT_CLAIM() external view returns (bytes32)
+        function L2_BLOCK_NUMBER() external view returns (uint256)
         function challenges(address) external view returns (bool)
         function challenge(bytes calldata) external
     ]"

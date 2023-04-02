@@ -8,10 +8,12 @@ import "./MockDisputeGameFactory.sol";
 ///      on a local devnet.
 contract MockDisputeGame_OutputAttestation {
     Claim public immutable ROOT_CLAIM;
+    uint256 public immutable L2_BLOCK_NUMBER;
     mapping(address => bool) public challenges;
 
-    constructor(Claim _rootClaim, address _creator) {
+    constructor(Claim _rootClaim, uint256 l2BlockNumber, address _creator) {
         ROOT_CLAIM = _rootClaim;
+        L2_BLOCK_NUMBER = l2BlockNumber;
         challenges[_creator] = true;
     }
 

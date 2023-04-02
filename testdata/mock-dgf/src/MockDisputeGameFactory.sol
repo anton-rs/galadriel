@@ -31,7 +31,8 @@ contract MockDisputeGameFactory {
     /// @param rootClaim The root claim of the DisputeGame.
     /// @param extraData Any extra data that should be provided to the created dispute game.
     function create(GameType gameType, Claim rootClaim, bytes calldata extraData) external returns (MockDisputeGame_OutputAttestation mock) {
-        mock = new MockDisputeGame_OutputAttestation(rootClaim, msg.sender);
+        uint256 l2BlockNumber = abi.decode(extraData, (uint256));
+        mock = new MockDisputeGame_OutputAttestation(rootClaim, l2BlockNumber, msg.sender);
         emit DisputeGameCreated(address(mock), gameType, rootClaim);
         extraData; // Unused
     }
