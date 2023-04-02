@@ -6,11 +6,8 @@ use ethers::{
 };
 use serde::{Deserialize, Serialize};
 
-/// The [SignerMiddlewareWS] type is a [SignerMiddleware] that uses a [Provider] with a [Ws] transport.
-pub type SignerMiddlewareWS = SignerMiddleware<Provider<Ws>, LocalWallet>;
-
-/// The [GameType] enum defines the different types of [DisputeGames] with cloneable
-/// implementations in the [DisputeGame_Factory] contract.
+/// The [GameType] enum defines the different types of dispute games with cloneable
+/// implementations in the `DisputeGameFactory` contract.
 #[repr(u8)]
 pub enum GameType {
     Fault = 0,
@@ -31,8 +28,11 @@ impl TryFrom<u8> for GameType {
     }
 }
 
+/// The [SignerMiddlewareWS] type is a [SignerMiddleware] that uses a [Provider] with a [Ws] transport.
+pub(crate) type SignerMiddlewareWS = SignerMiddleware<Provider<Ws>, LocalWallet>;
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct OutputAtBlockResponse {
+pub(crate) struct OutputAtBlockResponse {
     pub output_root: H256,
 }

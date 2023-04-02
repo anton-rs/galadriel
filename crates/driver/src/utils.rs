@@ -17,7 +17,7 @@ use std::sync::Arc;
 /// # Returns
 /// * Some(bool) if the request was successful, None otherwise. The bool represents whether the
 /// untrusted root matches the trusted root.
-pub async fn compare_output_root(
+pub(crate) async fn compare_output_root(
     node_provider: Arc<Provider<Http>>,
     untrusted_root: &H256,
     block_number: u64,

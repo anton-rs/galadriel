@@ -8,7 +8,7 @@ use ethers::{
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 
-/// The [DriverConfig] struct contains the configuration for the [Driver].
+/// The [DriverConfig] struct contains the configuration for the [Driver](crate::Driver) implementations.
 #[derive(Debug)]
 pub struct DriverConfig {
     /// The provider used to index events and send transactions on L1.

@@ -45,7 +45,7 @@ pub async fn output_proposed(
             if matches {
                 tracing::debug!(target: "output-attestation-driver", "Output proposed on L1 for L2 block #{} matches output at block on trusted L2 RPC.", proposed_block);
             } else {
-                tracing::warn!(target: "output-attestation-driver", "Output proposed by L1 does not match output at block on L2. L1: {:?}, L2: {:?}", proposed_root, output_at_block.output_root);
+                tracing::warn!(target: "output-attestation-driver", "Output proposed by L1 does not match output at block on trusted node. L1: {:?}, L2: {:?}", proposed_root, output_at_block.output_root);
 
                 // Check to see if someone has already challenged this output proposal.
                 tracing::debug!(target: "output-attestation-driver", "Checking to see if a challenge has already been submitted to L1 for the disagreed upon output...");
@@ -133,7 +133,7 @@ pub async fn game_created_output_attestation(
         if matches {
             tracing::info!(target: "dispute-factory-driver", "Root claim in game {} matches the node's output root at block {}. Not offering a challenge.", game_addr, l2_block_number);
         } else {
-            tracing::info!(target: "dispute-factory-driver", "Root claim in game {} does not match the trusted node's output root at block {}.", game_addr, l2_block_number);
+            tracing::warn!(target: "dispute-factory-driver", "Root claim in game {} does not match the trusted node's output root at block {}.", game_addr, l2_block_number);
 
             // Sign the root claim.
             let signed_root = config.l1_provider.signer().sign_hash(root_claim)?;
