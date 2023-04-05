@@ -13,11 +13,11 @@ contract MocksTest is Test {
         factory = new MockDisputeGameFactory();
     }
 
-    function testCreate(uint8 gameType, Claim rootClaim, bytes calldata extraData) external {
+    function testCreate(uint8 gameType, Claim rootClaim, uint256 l2BlockNumber) external {
         vm.assume(gameType <= 2);
 
         vm.expectEmit(false, true, true, false);
         emit DisputeGameCreated(address(0), GameType(gameType), rootClaim);
-        factory.create(GameType(gameType), rootClaim, extraData);
+        factory.create(GameType(gameType), rootClaim, abi.encodePacked(l2BlockNumber));
     }
 }

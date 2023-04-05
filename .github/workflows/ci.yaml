@@ -1,7 +1,22 @@
-name: Rust CI
+name: ci
+
 on: [push]
 
 jobs:
+  foundry-tests:
+    name: Foundry project
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+      - name: Run Forge build
+        run: cd testdata/mock-dgf && forge test
+        id: build
   cargo-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 20
