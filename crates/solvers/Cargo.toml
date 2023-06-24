@@ -9,3 +9,6 @@ edition = "2021"
 anyhow = "1.0.70"
 tracing = "0.1.37"
 ethers = { version = "2.0.1", features = ["ws"] }
+
+[dev-dependencies]
+op-challenger-driver = { path = "../driver" }

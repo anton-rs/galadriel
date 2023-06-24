@@ -14,12 +14,12 @@ use std::sync::Arc;
 /// TODO: This should be 63; Pad the tree.
 const MAX_DEPTH: u64 = 4;
 
-/// A struct containing information and the world state of a [FaultDisputeGame].
+/// A struct containing information and the world state of a [op-challenger-driver::bindings::FaultDisputeGame].
 pub struct AlphabetGame {
     /// The address of the dispute game contract.
     pub address: Address,
     /// The UNIX timestamp of the game's creation.
-    pub created_at: u128,
+    pub created_at: u64,
     /// The current state of the game DAG.
     pub state: Vec<ClaimData>,
     /// Our full execution trace
