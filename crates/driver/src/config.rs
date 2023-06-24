@@ -5,11 +5,11 @@ use ethers::{
     providers::{Http, Provider},
     types::{transaction::eip2718::TypedTransaction, Address},
 };
+use postgres::{Client, NoTls};
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 
 /// The [DriverConfig] struct contains the configuration for the [Driver](crate::Driver) implementations.
-#[derive(Debug)]
 pub struct DriverConfig {
     /// The provider used to index events and send transactions on L1.
     pub l1_provider: Arc<SignerMiddlewareWS>,
@@ -17,6 +17,8 @@ pub struct DriverConfig {
     /// This RPC should be 100% trusted- the bot will use this endpoint as the source of truth
     /// for the L2 chain in output attestation games.
     pub node_provider: Arc<Provider<Http>>,
+    /// The PostgreSQL database client.
+    pub db_client: Mutex<Client>,
     /// The address of the dispute game factory contract.
     pub dispute_game_factory: Address,
     /// The address of the L2OutputOracle contract.
@@ -37,10 +39,16 @@ impl DriverConfig {
     ) -> Self {
         // Create a new MPSC channel for sending transactions from the drivers.
         let (tx_sender, tx_receiver) = mpsc::channel(128);
+        // Create a new PostgreSQL client.
+        let db_client = Mutex::new(
+            Client::connect("host=localhost user=postgres", NoTls)
+                .expect("Failed to connect to database. Is Postgres running?"),
+        );
 
         Self {
             l1_provider,
             node_provider,
+            db_client,
             dispute_game_factory,
             l2_output_oracle,
             tx_sender,
