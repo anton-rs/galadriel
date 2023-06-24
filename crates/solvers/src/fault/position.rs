@@ -48,7 +48,7 @@ impl Position for u128 {
     }
 
     fn right(&self) -> Self {
-        (self << 1) | 1
+        self.left() | 1
     }
 
     fn parent(&self) -> Self {

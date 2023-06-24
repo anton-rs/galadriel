@@ -28,7 +28,7 @@ pub struct AlphabetGame {
 
 impl Game<u8> for AlphabetGame {
     fn respond(&self, parent_index: usize) -> Result<Response> {
-        let parent_claim = self
+        let parent = self
             .state
             .get(parent_index)
             .ok_or(anyhow!("Invalid parent index"))?;
@@ -37,40 +37,40 @@ impl Game<u8> for AlphabetGame {
         let mut is_attack = false;
 
         // Fetch our version of the parent claim.
-        let our_parent_claim = self.claim_at(parent_claim.position)?;
-        if our_parent_claim == parent_claim.claim {
+        let our_parent_claim = self.claim_at(parent.position)?;
+        if our_parent_claim == parent.claim {
             // The parent claim is valid according to our trace; Do nothing.
             return Ok(Response::DoNothing);
         }
 
-        if parent_claim.parent_index as u32 == u32::MAX {
+        if parent.parent_index as u32 == u32::MAX {
             // The parent claim is the root claim; Our only option is to attack it.
             is_attack = true;
         } else {
             // Fetch our version of the grandparent claim.
-            let grandparent_claim = self
+            let grandparent = self
                 .state
-                .get(parent_claim.parent_index)
+                .get(parent.parent_index)
                 .ok_or(anyhow!("Invalid grandparent index"))?;
-            let our_grandparent_claim = self.claim_at(grandparent_claim.position)?;
+            let our_grandparent_claim = self.claim_at(grandparent.position)?;
 
-            if our_parent_claim != parent_claim.claim {
+            if our_parent_claim != parent.claim {
                 // Attack the parent; We disagree with it.
                 is_attack = true;
 
-                if our_grandparent_claim != grandparent_claim.claim {
+                if our_grandparent_claim != grandparent.claim {
                     // Attack the grandparent as a secondary move; We disagree with it as well.
-                    secondary_move_pos = Some(grandparent_claim.position.make_move(is_attack));
+                    secondary_move_pos = Some(grandparent.position.make_move(is_attack));
                 }
             }
         }
 
         // Compute the position of the primary move.
-        let move_pos = parent_claim.position.make_move(is_attack);
+        let move_pos = parent.position.make_move(is_attack);
 
         // If we are past the maximum depth, perform a step.
         if move_pos.depth() > MAX_DEPTH {
-            let state_index = 0;
+            let mut state_index = 0;
             let pre_state_preimage = Bytes::default();
             let proof = Bytes::default();
 
@@ -79,9 +79,9 @@ impl Game<u8> for AlphabetGame {
             // move position is 0, it is an attack where the prestate is the absolute prestate.
             if move_pos.index_at_depth() > 0 {
                 let leaf_pos = if is_attack {
-                    parent_claim.position - 1
+                    parent.position - 1
                 } else {
-                    parent_claim.position + 1
+                    parent.position + 1
                 };
                 let mut state_pos = leaf_pos;
 
@@ -91,7 +91,16 @@ impl Game<u8> for AlphabetGame {
                 }
 
                 // Search for the index of the claim that commits to the prestate's trace index.
-                todo!()
+                // TODO: This isn't sufficient for a game with multiple participants. There can
+                // be multiple claims that exist at the same position. We want the one on the
+                // same path as the trace we're countering.
+                state_index = self
+                    .state
+                    .iter()
+                    .enumerate()
+                    .find(|(_, claim)| claim.position == state_pos)
+                    .map(|(i, _)| i)
+                    .unwrap_or(0)
             }
 
             Ok(Response::Step(
@@ -107,8 +116,7 @@ impl Game<u8> for AlphabetGame {
                 is_attack,
                 self.claim_at(move_pos)?,
                 secondary_move_pos
-                    // TODO: Safeguard unwrap.
-                    .map(|pos| (parent_claim.parent_index, self.claim_at(pos).unwrap())),
+                    .map(|pos| (parent.parent_index, self.claim_at(pos).unwrap_or_default())),
             ))
         }
     }
