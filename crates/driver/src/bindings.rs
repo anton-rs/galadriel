@@ -17,13 +17,17 @@ abigen!(
     ]"
 );
 
-// Generates the bindings for the `DisputeGame_OutputAttestation` contract.
+// Generates the bindings for the `FaultDisputeGame` contract.
 abigen!(
-    DisputeGame_OutputAttestation,
+    FaultDisputeGame,
     r"[
-        function ROOT_CLAIM() external view returns (bytes32)
-        function L2_BLOCK_NUMBER() external view returns (uint256)
-        function challenges(address) external view returns (bool)
-        function challenge(bytes calldata) external
+        function attack(uint256 _parentIndex, bytes32 _pivot) external payable
+        function defend(uint256 _parentIndex, bytes32 _pivot) external payable
+        function claimData(uint256 _index) external view returns ((uint32,bool,bytes32,uint128,uint128))
+        function step(uint256 _stateIndex, uint256 _claimIndex, bool _isAttack, bytes calldata _stateData, bytes calldata _proof) external
+        function resolve() external returns (uint8)
+        function rootClaim() external pure returns (bytes32)
+        function createdAt() external view returns (uint64)
+        function l2BlockNumber() external view returns (uint256)
     ]"
 );

@@ -8,6 +8,9 @@ mod bindings;
 mod config;
 pub use config::DriverConfig;
 
+mod state;
+pub use state::GlobalState;
+
 mod drivers;
 pub use drivers::*;
 

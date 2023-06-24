@@ -16,8 +16,6 @@ use std::sync::Arc;
 const MAX_DEPTH: u64 = 4;
 
 /// A struct containing information and the world state of a [op-challenger-driver::bindings::FaultDisputeGame].
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct AlphabetGame {
     /// The address of the dispute game contract.
     pub address: Address,

@@ -1,18 +1,25 @@
 //! The `driver` module contains implementations of the [Driver] trait.
 
 use crate::{
-    bindings::{DisputeGame_Factory, L2OutputOracle},
-    handlers,
+    bindings::{DisputeGame_Factory, FaultDisputeGame},
     types::GameType,
-    Driver, DriverConfig,
+    Driver, DriverConfig, GlobalState,
 };
 use anyhow::Result;
 use async_trait::async_trait;
 use ethers::{
     providers::{Middleware, StreamExt},
-    types::Address,
+    types::{Address, U256},
 };
+use op_challenger_solvers::fault::{AlphabetGame, ClaimData, Clock};
 use std::sync::Arc;
+use tokio::sync::Mutex;
+
+/// The trace for the alphabet game.
+/// TODO: Delete this.
+const TRACE: [u8; 16] = [
+    16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
+];
 
 /// Defines a new [Driver] implementation.
 #[macro_export]
@@ -23,6 +30,8 @@ macro_rules! define_driver {
         pub struct $name {
             /// The configuration for all of the drivers.
             pub config: Arc<DriverConfig>,
+            /// The global state.
+            pub state: Arc<Mutex<GlobalState>>,
         }
 
         #[async_trait]
@@ -35,8 +44,8 @@ macro_rules! define_driver {
 
         impl $name {
             #[doc = concat!("Creates a new instance of the [", stringify!($name), "] driver.")]
-            pub fn new(config: Arc<DriverConfig>) -> Self {
-                Self { config }
+            pub fn new(config: Arc<DriverConfig>, state: Arc<Mutex<GlobalState>>) -> Self {
+                Self { config, state }
             }
         }
     };
@@ -104,61 +113,45 @@ define_driver!(
                 if let Ok(game_type) = GameType::try_from(game_type_u8) {
                     match game_type {
                         GameType::Fault => {
-                            tracing::error!(target: "dispute-factory-driver", "DisputeGameCreated event contained a `Fault` game type, which is not yet supported");
+                            tracing::info!(target: "dispute-factory-driver", "New Fault game created at address {}. Fetching root claim data...", game_addr);
+
+                            // Fetch the root claim data.
+                            let game = FaultDisputeGame::new(
+                                game_addr,
+                                Arc::clone(&self.config.l1_provider),
+                            );
+                            let created_at = game.created_at().await?;
+                            let root_claim_data = game.claim_data(U256::zero()).await?;
+
+                            tracing::info!(target: "dispute-factory-driver", "Fetched root claim data successfully. Locking global state mutex and pushing new game...");
+                            self.state.lock().await.games.push(AlphabetGame {
+                                address: game_addr,
+                                created_at,
+                                state: vec![ClaimData {
+                                    parent_index: root_claim_data.0 as usize,
+                                    countered: root_claim_data.1,
+                                    claim: root_claim_data.2.into(),
+                                    position: root_claim_data.3,
+                                    clock: Clock {
+                                        duration: (root_claim_data.4 >> 64) as u64,
+                                        timestamp: (root_claim_data.4 & (u64::MAX as u128)) as u64,
+                                    },
+                                }],
+                                trace: Arc::new(TRACE),
+                            });
+                            tracing::info!(target: "dispute-factory-driver", "Pushed new game successfully. Forwarding dispatch to the fault game driver...");
                         }
                         GameType::Validity => {
                             tracing::error!(target: "dispute-factory-driver", "DisputeGameCreated event contained a `Validity` game type, which is not yet supported");
                         }
                         GameType::OutputAttestation => {
-                            tracing::info!("DisputeGameCreated event contained an `OutputAttestation` game type, executing handler...");
-                            handlers::game_created_output_attestation(
-                                Arc::clone(&self.config),
-                                game_addr,
-                            )
-                            .await?;
+                            tracing::error!(target: "dispute-factory-driver", "DisputeGameCreated event contained a `OutputAttestation` game type, which is not yet supported");
                         }
                     }
                 } else {
                     tracing::error!(target: "dispute-factory-driver", "DisputeGameCreated event contained an unknown game type: {}", game_type_u8);
                     continue;
                 }
-
-                // TODO: Track the dispute game contract address and the dispute game type in a
-                // local database for games that require multiple responses.
-
-                // dbg!(dispute_game_created);
-            }
-
-            Ok(())
-        }
-    })
-);
-
-define_driver!(
-    OutputAttestationDriver,
-    (|self: OutputAttestationDriver| {
-        async move {
-            tracing::info!(target: "output-attestation-driver", "Subscribing to OutputProposed events...");
-            let oracle = L2OutputOracle::new(
-                self.config.l2_output_oracle,
-                Arc::clone(&self.config.l1_provider),
-            );
-            let factory = DisputeGame_Factory::new(
-                self.config.dispute_game_factory,
-                Arc::clone(&self.config.l1_provider),
-            );
-
-            let mut stream = self
-                .config
-                .l1_provider
-                .subscribe_logs(&oracle.output_proposed_filter().filter)
-                .await?;
-
-            tracing::info!(target: "output-attestation-driver", "Subscribed to OutputProposed events, beginning event loop.");
-            while let Some(output_proposed) = stream.next().await {
-                tracing::debug!(target: "output-attestation-driver", "OutputProposed event received");
-                handlers::output_proposed(Arc::clone(&self.config), &factory, output_proposed)
-                    .await?;
             }
 
             Ok(())

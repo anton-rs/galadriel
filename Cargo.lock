@@ -1977,6 +1977,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "ethers",
+ "op-challenger-solvers",
  "serde",
  "serde_json",
  "tokio",
@@ -1990,8 +1991,6 @@ dependencies = [
  "anyhow",
  "ethers",
  "op-challenger-driver",
- "serde",
- "serde_json",
  "tracing",
 ]
 
