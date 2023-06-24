@@ -33,8 +33,8 @@ impl Game<u8> for AlphabetGame {
             .get(parent_index)
             .ok_or(anyhow!("Invalid parent index"))?;
 
-        let mut secondary_move_pos = None;
         let mut is_attack = false;
+        let mut secondary_move_pos = None;
 
         // Fetch our version of the parent claim.
         let our_parent_claim = self.claim_at(parent.position)?;
@@ -84,26 +84,19 @@ impl Game<u8> for AlphabetGame {
                 } else {
                     parent.position + 1
                 };
-                let mut state_pos = leaf_pos;
 
-                // Find the highest position that commits to the same trace index as the leaf.
-                while state_pos.parent().right_index(MAX_DEPTH) == leaf_pos {
-                    state_pos = state_pos.parent();
+                // Search for the index of the claim that commits to the `leaf_pos`' trace index.
+                // This claim must exist within the same path as the trace we're countering,
+                // so we can walk up the DAG starting from the parent and find the claim that
+                // commits to the same trace index as the `leaf_pos`.
+                let mut state_claim = parent;
+                while state_claim.position.right_index(MAX_DEPTH) != leaf_pos {
+                    state_index = state_claim.parent_index;
+                    state_claim = self
+                        .state
+                        .get(state_index)
+                        .ok_or(anyhow!("Invalid parent index"))?;
                 }
-
-                // Search for the index of the claim that commits to the prestate's trace index.
-                // TODO: This isn't sufficient for a game with multiple participants. There can
-                // be multiple claims that exist at the same position. We want the one on the
-                // same path as the trace we're countering. To do this, we can walk up the DAG
-                // starting from the parent and find the claim at the desired `state_pos` rather
-                // than searching the full game state.
-                state_index = self
-                    .state
-                    .iter()
-                    .enumerate()
-                    .find(|(_, claim)| claim.position == state_pos)
-                    .map(|(i, _)| i)
-                    .unwrap_or(0)
             }
 
             Ok(Response::Step(
