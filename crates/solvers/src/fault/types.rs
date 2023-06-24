@@ -1,6 +1,7 @@
 //! The types module contains all of the types relevant to the fault dispute game.
 
 use ethers::types::{Bytes, H256};
+use serde::{Deserialize, Serialize};
 
 /// The [Claim] type represents a claim on the execution trace at a given trace index that is
 /// made by a participant in a dispute game.
@@ -8,6 +9,8 @@ pub type Claim = H256;
 
 /// The [Clock] struct represents a clock that is used to track the duration and timestamp of a
 /// given [Claim] within the game.
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Clock {
     /// The duration remaining on the chess clock.
     pub duration: u64,
@@ -16,6 +19,8 @@ pub struct Clock {
 }
 
 /// The [ClaimData] struct represents a [Claim] as well as the data associated with it.
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ClaimData {
     /// The index of the parent claim in the DAG array.
     pub parent_index: usize,
