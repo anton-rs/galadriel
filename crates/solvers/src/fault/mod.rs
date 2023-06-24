@@ -8,7 +8,7 @@ mod types;
 pub use types::*;
 
 mod game;
-pub use game::Game;
+pub use game::FaultGame;
 
 mod alphabet;
 pub use alphabet::AlphabetGame;

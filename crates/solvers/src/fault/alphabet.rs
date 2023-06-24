@@ -1,7 +1,7 @@
 //! The alphabet module contains an implementation of the [Game] trait for the
 //! alphabet fault dispute game.
 
-use super::{Claim, ClaimData, Game, Position, Response};
+use super::{Claim, ClaimData, FaultGame, Position, Response};
 use anyhow::{anyhow, Result};
 use ethers::{
     abi::{self, Token},
@@ -26,7 +26,7 @@ pub struct AlphabetGame {
     pub trace: Arc<[u8]>,
 }
 
-impl Game<u8> for AlphabetGame {
+impl FaultGame<u8> for AlphabetGame {
     fn respond(&self, parent_index: usize) -> Result<Response> {
         let parent = self.claim_data(parent_index)?;
 

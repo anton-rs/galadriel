@@ -1,11 +1,11 @@
-//! The game module holds the [Game] trait.
+//! The game module holds the [FaultGame] trait.
 
-use crate::fault::types::{Claim, ClaimData, Response};
+use super::{Claim, ClaimData, Response};
 use anyhow::Result;
 
-/// The [Game] trait defines the interface for a local copy of an onchain fault dispute game.
-pub trait Game<T> {
-    /// Respond to a [crate::Claim] made by a participant in the dispute game.
+/// The [FaultGame] trait defines the interface for a local copy of an onchain fault dispute game.
+pub trait FaultGame<T> {
+    /// Respond to a [Claim] made by a participant in the dispute game.
     ///
     /// ### Takes
     /// - `parent_index`: The index of the parent claim in the DAG array.
