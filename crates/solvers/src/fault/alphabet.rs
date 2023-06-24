@@ -85,7 +85,9 @@ impl FaultGame<u8> for AlphabetGame {
 
             // First, we need to find the pre/post state index within the claim data depending
             // on whether we are making an attack or defense step. If the index at depth of the
-            // move position is 0, it is an attack where the prestate is the absolute prestate.
+            // move position is 0, it is an attack where the prestate is the absolute prestate. In
+            // this situation, the contract will determine the prestate itself and use the parent
+            // claim as the poststate.
             if move_pos.index_at_depth() > 0 {
                 let leaf_pos = if is_attack {
                     parent.position - 1
@@ -103,22 +105,16 @@ impl FaultGame<u8> for AlphabetGame {
                     state = self.claim_data(state_index)?;
                 }
 
-                // Grab the state data for the prestate.
-                // If the move is an attack, the prestate is at the trace index relative to
-                // `state`.
-                // If the move is a defense, the prestate is at the trace index relative to
-                // `parent`.
-                // TODO: Clean up with a macro.
+                // Grab the state data for the prestate. The state data is the preimage for the
+                // prestate claim.
+                // If the move is an attack, the prestate of the step is at the trace index
+                // relative to `state`.
+                // If the move is a defense, the prestate of the step is at the trace index
+                // relative to `parent`.
                 state_data = if is_attack {
-                    Bytes::from(abi::encode(&[
-                        Token::Uint(U256::from(state.position.trace_index(MAX_DEPTH))),
-                        Token::Uint(U256::from(self.state_at(state.position)?)),
-                    ]))
+                    self.encode_claim(state.position)?
                 } else {
-                    Bytes::from(abi::encode(&[
-                        Token::Uint(U256::from(parent.position.trace_index(MAX_DEPTH))),
-                        Token::Uint(U256::from(self.state_at(parent.position)?)),
-                    ]))
+                    self.encode_claim(parent.position)?
                 }
             }
 
@@ -151,11 +147,18 @@ impl FaultGame<u8> for AlphabetGame {
     }
 
     fn claim_at(&self, position: u128) -> Result<Claim> {
-        let trace_at = self.state_at(position)?;
-        let claim_hash = keccak256(abi::encode(&[
+        let claim_hash = keccak256(self.encode_claim(position)?);
+        Ok(claim_hash.into())
+    }
+}
+
+impl AlphabetGame {
+    /// ABI encodes the pre-image for the given [Position].
+    fn encode_claim(&self, position: u128) -> Result<Bytes> {
+        Ok(abi::encode(&[
             Token::Uint(U256::from(position.trace_index(MAX_DEPTH))),
-            Token::Uint(U256::from(trace_at)),
-        ]));
-        Ok(Claim::from(claim_hash))
+            Token::Uint(U256::from(self.state_at(position)?)),
+        ])
+        .into())
     }
 }
