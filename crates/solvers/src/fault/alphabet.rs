@@ -28,10 +28,7 @@ pub struct AlphabetGame {
 
 impl Game<u8> for AlphabetGame {
     fn respond(&self, parent_index: usize) -> Result<Response> {
-        let parent = self
-            .state
-            .get(parent_index)
-            .ok_or(anyhow!("Invalid parent index"))?;
+        let parent = self.claim_data(parent_index)?;
 
         let mut is_attack = false;
         let mut secondary_move_pos = None;
@@ -48,10 +45,7 @@ impl Game<u8> for AlphabetGame {
             is_attack = true;
         } else {
             // Fetch our version of the grandparent claim.
-            let grandparent = self
-                .state
-                .get(parent.parent_index)
-                .ok_or(anyhow!("Invalid grandparent index"))?;
+            let grandparent = self.claim_data(parent.parent_index)?;
             let our_grandparent_claim = self.claim_at(grandparent.position)?;
 
             if our_parent_claim != parent.claim {
@@ -92,10 +86,7 @@ impl Game<u8> for AlphabetGame {
                 let mut state_claim = parent;
                 while state_claim.position.right_index(MAX_DEPTH) != leaf_pos {
                     state_index = state_claim.parent_index;
-                    state_claim = self
-                        .state
-                        .get(state_index)
-                        .ok_or(anyhow!("Invalid parent index"))?;
+                    state_claim = self.claim_data(state_index)?;
                 }
             }
 
@@ -114,6 +105,10 @@ impl Game<u8> for AlphabetGame {
                     .map(|pos| (parent.parent_index, self.claim_at(pos).unwrap_or_default())),
             ))
         }
+    }
+
+    fn claim_data(&self, index: usize) -> Result<&ClaimData> {
+        self.state.get(index).ok_or(anyhow!("Invalid claim index"))
     }
 
     fn state_at(&self, position: u128) -> Result<u8> {
