@@ -1984,6 +1984,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "op-challenger-solvers"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ethers",
+ "tracing",
+]
+
+[[package]]
 name = "op-challenger-tui"
 version = "0.1.0"
 dependencies = [
