@@ -12,7 +12,7 @@ use ethers::{
     types::{Address, U256},
 };
 use op_challenger_solvers::fault::{AlphabetGame, ClaimData, Clock};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 
 /// The trace for the alphabet game.
@@ -123,6 +123,11 @@ define_driver!(
                             let created_at = game.created_at().await?;
                             let root_claim_data = game.claim_data(U256::zero()).await?;
 
+                            // TODO: Global state is entirely in memory, this won't do. We need to
+                            // persist games to a local database and load them on startup. In
+                            // addition, it'd be great to get a reverse sync mechanism going so
+                            // that games that are not locally stored can be fetched and existing
+                            // ongoing games can be updated.
                             tracing::info!(target: "dispute-factory-driver", "Fetched root claim data successfully. Locking global state mutex and pushing new game...");
                             self.state.lock().await.games.push(AlphabetGame {
                                 address: game_addr,
@@ -155,6 +160,23 @@ define_driver!(
             }
 
             Ok(())
+        }
+    })
+);
+
+define_driver!(
+    FaultGamePlayer,
+    (|self: FaultGamePlayer| {
+        async move {
+            loop {
+                tracing::info!(target: "fault-game-player", "Checking for updates in ongoing FaultDisputeGames...");
+
+                // TODO: Look for ongoing disputes.
+
+                // Check again in 30 seconds.
+                tracing::debug!(target: "fault-game-player", "Done checking for updates. Sleeping for 30 seconds...");
+                tokio::time::sleep(Duration::from_secs(60)).await;
+            }
         }
     })
 );
