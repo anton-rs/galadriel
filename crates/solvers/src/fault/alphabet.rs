@@ -35,27 +35,41 @@ impl FaultGame<u8> for AlphabetGame {
 
         // Fetch our version of the parent claim.
         let our_parent_claim = self.claim_at(parent.position)?;
-        if our_parent_claim == parent.claim {
-            // The parent claim is valid according to our trace; Do nothing.
-            return Ok(Response::DoNothing);
-        }
 
-        if parent.parent_index as u32 == u32::MAX {
-            // The parent claim is the root claim; Our only option is to attack it.
+        // There are 2 possible response options to the root claim:
+        // 1. Disagree with the root: Attack the root.
+        // 2. Agree with the root: Do nothing.
+        // There are 4 response options to a given claim that is *not* the root claim:
+        // 1. Disagree with the parent, agree with grandparent: Attack the parent.
+        // 2. Disagree with the parent, disagree with grandparent: Attack the parent *and* grandparent.
+        // 3. Agree with the parent, disagree with grandparent: Do nothing.
+        // 4. Agree with the parent, agree with grandparent: Defend the parent.
+        if our_parent_claim != parent.claim {
+            // We disagree with the parent; The move will always be an attack.
             is_attack = true;
-        } else {
-            // Fetch our version of the grandparent claim.
-            let grandparent = self.claim_data(parent.parent_index)?;
-            let our_grandparent_claim = self.claim_at(grandparent.position)?;
 
-            if our_parent_claim != parent.claim {
-                // Attack the parent; We disagree with it.
-                is_attack = true;
-
+            // If the parent is not the root, we check the grandparent as well.
+            if parent.parent_index as u32 != u32::MAX {
+                // Fetch our version of the grandparent claim.
+                let grandparent = self.claim_data(parent.parent_index)?;
+                let our_grandparent_claim = self.claim_at(grandparent.position)?;
                 if our_grandparent_claim != grandparent.claim {
                     // Attack the grandparent as a secondary move; We disagree with it as well.
                     secondary_move_pos = Some(grandparent.position.make_move(is_attack));
                 }
+            }
+        } else {
+            // If we agree with the root claim, do nothing.
+            if parent.parent_index as u32 == u32::MAX {
+                return Ok(Response::DoNothing);
+            }
+
+            // Fetch our version of the grandparent claim. If we agree with it as well,
+            // we defend the parent claim.
+            let grandparent = self.claim_data(parent.parent_index)?;
+            let our_grandparent_claim = self.claim_at(grandparent.position)?;
+            if our_grandparent_claim != grandparent.claim {
+                return Ok(Response::DoNothing);
             }
         }
 
