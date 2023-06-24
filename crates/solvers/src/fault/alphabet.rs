@@ -11,7 +11,7 @@ use ethers::{
 use std::sync::Arc;
 
 /// The maximum depth of the alphabet game.
-/// TODO: This should be 64; Pad the tree.
+/// TODO: This should be 63; Pad the tree.
 const MAX_DEPTH: u64 = 4;
 
 /// A struct containing information and the world state of a [FaultDisputeGame].
@@ -80,7 +80,7 @@ impl FaultGame<u8> for AlphabetGame {
         // Otherwise, make a move.
         if move_pos.depth() > MAX_DEPTH {
             let mut state_index = 0;
-            let pre_state_preimage = Bytes::default();
+            let mut state_data = Bytes::default();
             let proof = Bytes::default();
 
             // First, we need to find the pre/post state index within the claim data depending
@@ -97,10 +97,28 @@ impl FaultGame<u8> for AlphabetGame {
                 // This claim must exist within the same path as the trace we're countering,
                 // so we can walk up the DAG starting from the parent and find the claim that
                 // commits to the same trace index as the `leaf_pos`.
-                let mut state_claim = parent;
-                while state_claim.position.right_index(MAX_DEPTH) != leaf_pos {
-                    state_index = state_claim.parent_index;
-                    state_claim = self.claim_data(state_index)?;
+                let mut state = parent;
+                while state.position.right_index(MAX_DEPTH) != leaf_pos {
+                    state_index = state.parent_index;
+                    state = self.claim_data(state_index)?;
+                }
+
+                // Grab the state data for the prestate.
+                // If the move is an attack, the prestate is at the trace index relative to
+                // `state`.
+                // If the move is a defense, the prestate is at the trace index relative to
+                // `parent`.
+                // TODO: Clean up with a macro.
+                state_data = if is_attack {
+                    Bytes::from(abi::encode(&[
+                        Token::Uint(U256::from(state.position.trace_index(MAX_DEPTH))),
+                        Token::Uint(U256::from(self.state_at(state.position)?)),
+                    ]))
+                } else {
+                    Bytes::from(abi::encode(&[
+                        Token::Uint(U256::from(parent.position.trace_index(MAX_DEPTH))),
+                        Token::Uint(U256::from(self.state_at(parent.position)?)),
+                    ]))
                 }
             }
 
@@ -108,7 +126,7 @@ impl FaultGame<u8> for AlphabetGame {
                 state_index,
                 parent_index,
                 is_attack,
-                pre_state_preimage,
+                state_data,
                 proof,
             ))
         } else {
