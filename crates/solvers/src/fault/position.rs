@@ -71,258 +71,59 @@ impl Position for u128 {
 
 #[cfg(test)]
 mod test {
-    use super::{compute_gindex, Position};
+    use super::Position;
+
+    /// A helper struct for testing the [Position] trait implementation for [std::u128].
+    /// 0. `u64` - `depth`
+    /// 1. `u64` - `index_at_depth`
+    /// 2. `u128` - `right_index`
+    /// 3. `u64` - `trace_index`
+    struct PositionMetaData(u64, u64, u128, u64);
 
     const MAX_DEPTH: u64 = 4;
+    const EXPECTED_VALUES: &[PositionMetaData] = &[
+        PositionMetaData(0, 0, 31, 15),
+        PositionMetaData(1, 0, 23, 7),
+        PositionMetaData(1, 1, 31, 15),
+        PositionMetaData(2, 0, 19, 3),
+        PositionMetaData(2, 1, 23, 7),
+        PositionMetaData(2, 2, 27, 11),
+        PositionMetaData(2, 3, 31, 15),
+        PositionMetaData(3, 0, 17, 1),
+        PositionMetaData(3, 1, 19, 3),
+        PositionMetaData(3, 2, 21, 5),
+        PositionMetaData(3, 3, 23, 7),
+        PositionMetaData(3, 4, 25, 9),
+        PositionMetaData(3, 5, 27, 11),
+        PositionMetaData(3, 6, 29, 13),
+        PositionMetaData(3, 7, 31, 15),
+        PositionMetaData(4, 0, 16, 0),
+        PositionMetaData(4, 1, 17, 1),
+        PositionMetaData(4, 2, 18, 2),
+        PositionMetaData(4, 3, 19, 3),
+        PositionMetaData(4, 4, 20, 4),
+        PositionMetaData(4, 5, 21, 5),
+        PositionMetaData(4, 6, 22, 6),
+        PositionMetaData(4, 7, 23, 7),
+        PositionMetaData(4, 8, 24, 8),
+        PositionMetaData(4, 9, 25, 9),
+        PositionMetaData(4, 10, 26, 10),
+        PositionMetaData(4, 11, 27, 11),
+        PositionMetaData(4, 12, 28, 12),
+        PositionMetaData(4, 13, 29, 13),
+        PositionMetaData(4, 14, 30, 14),
+        PositionMetaData(4, 15, 31, 15),
+    ];
 
     #[test]
     fn position_correctness_static() {
-        let mut p = compute_gindex(0, 0);
-        assert_eq!(p, 1);
-        assert_eq!(p.depth(), 0);
-        assert_eq!(p.index_at_depth(), 0);
-        let mut r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 31);
-        assert_eq!(r.index_at_depth(), 15);
-
-        p = compute_gindex(1, 0);
-        assert_eq!(p, 2);
-        assert_eq!(p.depth(), 1);
-        assert_eq!(p.index_at_depth(), 0);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 23);
-        assert_eq!(r.index_at_depth(), 7);
-
-        p = compute_gindex(1, 1);
-        assert_eq!(p, 3);
-        assert_eq!(p.depth(), 1);
-        assert_eq!(p.index_at_depth(), 1);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 31);
-        assert_eq!(r.index_at_depth(), 15);
-
-        p = compute_gindex(2, 0);
-        assert_eq!(p, 4);
-        assert_eq!(p.depth(), 2);
-        assert_eq!(p.index_at_depth(), 0);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 19);
-        assert_eq!(r.index_at_depth(), 3);
-
-        p = compute_gindex(2, 1);
-        assert_eq!(p, 5);
-        assert_eq!(p.depth(), 2);
-        assert_eq!(p.index_at_depth(), 1);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 23);
-        assert_eq!(r.index_at_depth(), 7);
-
-        p = compute_gindex(2, 2);
-        assert_eq!(p, 6);
-        assert_eq!(p.depth(), 2);
-        assert_eq!(p.index_at_depth(), 2);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 27);
-        assert_eq!(r.index_at_depth(), 11);
-
-        p = compute_gindex(2, 3);
-        assert_eq!(p, 7);
-        assert_eq!(p.depth(), 2);
-        assert_eq!(p.index_at_depth(), 3);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 31);
-        assert_eq!(r.index_at_depth(), 15);
-
-        p = compute_gindex(3, 0);
-        assert_eq!(p, 8);
-        assert_eq!(p.depth(), 3);
-        assert_eq!(p.index_at_depth(), 0);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 17);
-        assert_eq!(r.index_at_depth(), 1);
-
-        p = compute_gindex(3, 1);
-        assert_eq!(p, 9);
-        assert_eq!(p.depth(), 3);
-        assert_eq!(p.index_at_depth(), 1);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 19);
-        assert_eq!(r.index_at_depth(), 3);
-
-        p = compute_gindex(3, 2);
-        assert_eq!(p, 10);
-        assert_eq!(p.depth(), 3);
-        assert_eq!(p.index_at_depth(), 2);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 21);
-        assert_eq!(r.index_at_depth(), 5);
-
-        p = compute_gindex(3, 3);
-        assert_eq!(p, 11);
-        assert_eq!(p.depth(), 3);
-        assert_eq!(p.index_at_depth(), 3);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 23);
-        assert_eq!(r.index_at_depth(), 7);
-
-        p = compute_gindex(3, 4);
-        assert_eq!(p, 12);
-        assert_eq!(p.depth(), 3);
-        assert_eq!(p.index_at_depth(), 4);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 25);
-        assert_eq!(r.index_at_depth(), 9);
-
-        p = compute_gindex(3, 5);
-        assert_eq!(p, 13);
-        assert_eq!(p.depth(), 3);
-        assert_eq!(p.index_at_depth(), 5);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 27);
-        assert_eq!(r.index_at_depth(), 11);
-
-        p = compute_gindex(3, 6);
-        assert_eq!(p, 14);
-        assert_eq!(p.depth(), 3);
-        assert_eq!(p.index_at_depth(), 6);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 29);
-        assert_eq!(r.index_at_depth(), 13);
-
-        p = compute_gindex(3, 7);
-        assert_eq!(p, 15);
-        assert_eq!(p.depth(), 3);
-        assert_eq!(p.index_at_depth(), 7);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 31);
-        assert_eq!(r.index_at_depth(), 15);
-
-        p = compute_gindex(4, 0);
-        assert_eq!(p, 16);
-        assert_eq!(p.depth(), 4);
-        assert_eq!(p.index_at_depth(), 0);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 16);
-        assert_eq!(r.index_at_depth(), 0);
-
-        p = compute_gindex(4, 1);
-        assert_eq!(p, 17);
-        assert_eq!(p.depth(), 4);
-        assert_eq!(p.index_at_depth(), 1);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 17);
-        assert_eq!(r.index_at_depth(), 1);
-
-        p = compute_gindex(4, 2);
-        assert_eq!(p, 18);
-        assert_eq!(p.depth(), 4);
-        assert_eq!(p.index_at_depth(), 2);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 18);
-        assert_eq!(r.index_at_depth(), 2);
-
-        p = compute_gindex(4, 3);
-        assert_eq!(p, 19);
-        assert_eq!(p.depth(), 4);
-        assert_eq!(p.index_at_depth(), 3);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 19);
-        assert_eq!(r.index_at_depth(), 3);
-
-        p = compute_gindex(4, 4);
-        assert_eq!(p, 20);
-        assert_eq!(p.depth(), 4);
-        assert_eq!(p.index_at_depth(), 4);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 20);
-        assert_eq!(r.index_at_depth(), 4);
-
-        p = compute_gindex(4, 5);
-        assert_eq!(p, 21);
-        assert_eq!(p.depth(), 4);
-        assert_eq!(p.index_at_depth(), 5);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 21);
-        assert_eq!(r.index_at_depth(), 5);
-
-        p = compute_gindex(4, 6);
-        assert_eq!(p, 22);
-        assert_eq!(p.depth(), 4);
-        assert_eq!(p.index_at_depth(), 6);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 22);
-        assert_eq!(r.index_at_depth(), 6);
-
-        p = compute_gindex(4, 7);
-        assert_eq!(p, 23);
-        assert_eq!(p.depth(), 4);
-        assert_eq!(p.index_at_depth(), 7);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 23);
-        assert_eq!(r.index_at_depth(), 7);
-
-        p = compute_gindex(4, 8);
-        assert_eq!(p, 24);
-        assert_eq!(p.depth(), 4);
-        assert_eq!(p.index_at_depth(), 8);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 24);
-        assert_eq!(r.index_at_depth(), 8);
-
-        p = compute_gindex(4, 9);
-        assert_eq!(p, 25);
-        assert_eq!(p.depth(), 4);
-        assert_eq!(p.index_at_depth(), 9);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 25);
-        assert_eq!(r.index_at_depth(), 9);
-
-        p = compute_gindex(4, 10);
-        assert_eq!(p, 26);
-        assert_eq!(p.depth(), 4);
-        assert_eq!(p.index_at_depth(), 10);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 26);
-        assert_eq!(r.index_at_depth(), 10);
-
-        p = compute_gindex(4, 11);
-        assert_eq!(p, 27);
-        assert_eq!(p.depth(), 4);
-        assert_eq!(p.index_at_depth(), 11);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 27);
-        assert_eq!(r.index_at_depth(), 11);
-
-        p = compute_gindex(4, 12);
-        assert_eq!(p, 28);
-        assert_eq!(p.depth(), 4);
-        assert_eq!(p.index_at_depth(), 12);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 28);
-        assert_eq!(r.index_at_depth(), 12);
-
-        p = compute_gindex(4, 13);
-        assert_eq!(p, 29);
-        assert_eq!(p.depth(), 4);
-        assert_eq!(p.index_at_depth(), 13);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 29);
-        assert_eq!(r.index_at_depth(), 13);
-
-        p = compute_gindex(4, 14);
-        assert_eq!(p, 30);
-        assert_eq!(p.depth(), 4);
-        assert_eq!(p.index_at_depth(), 14);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 30);
-        assert_eq!(r.index_at_depth(), 14);
-
-        p = compute_gindex(4, 15);
-        assert_eq!(p, 31);
-        assert_eq!(p.depth(), 4);
-        assert_eq!(p.index_at_depth(), 15);
-        r = p.right_index(MAX_DEPTH);
-        assert_eq!(r, 31);
-        assert_eq!(r.index_at_depth(), 15);
+        for (p, v) in EXPECTED_VALUES.iter().enumerate() {
+            let pos = (p + 1) as u128;
+            assert_eq!(pos.depth(), v.0);
+            assert_eq!(pos.index_at_depth(), v.1);
+            let r = pos.right_index(MAX_DEPTH);
+            assert_eq!(r, v.2);
+            assert_eq!(r.index_at_depth(), v.3);
+        }
     }
 }

@@ -69,6 +69,7 @@ impl Game<u8> for AlphabetGame {
         let move_pos = parent.position.make_move(is_attack);
 
         // If we are past the maximum depth, perform a step.
+        // Otherwise, make a move.
         if move_pos.depth() > MAX_DEPTH {
             let mut state_index = 0;
             let pre_state_preimage = Bytes::default();
@@ -93,7 +94,9 @@ impl Game<u8> for AlphabetGame {
                 // Search for the index of the claim that commits to the prestate's trace index.
                 // TODO: This isn't sufficient for a game with multiple participants. There can
                 // be multiple claims that exist at the same position. We want the one on the
-                // same path as the trace we're countering.
+                // same path as the trace we're countering. To do this, we can walk up the DAG
+                // starting from the parent and find the claim at the desired `state_pos` rather
+                // than searching the full game state.
                 state_index = self
                     .state
                     .iter()
@@ -111,7 +114,6 @@ impl Game<u8> for AlphabetGame {
                 proof,
             ))
         } else {
-            // Find the trace index that our next claim must commit to.
             Ok(Response::Move(
                 is_attack,
                 self.claim_at(move_pos)?,
