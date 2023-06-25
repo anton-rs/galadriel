@@ -32,8 +32,6 @@ pub struct ClaimData {
     pub position: u128,
     /// The clock that is used to track the duration elapsed and timestamp of the claim.
     pub clock: Clock,
-    /// Whether or not we have already formulated a response for the [Claim].
-    pub observed: bool,
 }
 
 /// A [Response] is an action taken by a participant in the dispute game in response to

@@ -10,7 +10,7 @@ use tokio::sync::Mutex;
 #[derive(Default, Serialize, Deserialize)]
 pub struct GlobalState {
     /// A mutable vector of all [AlphabetGame]s that are currently in progress.
-    pub games: Vec<AlphabetGame>,
+    pub alphabet_games: Vec<AlphabetGame>,
 }
 
 impl GlobalState {
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS alphabet_games (
 
     /// Dumps the global state to the database.
     pub async fn dump_to_db(&self, db_client: Mutex<Client>) -> Result<()> {
-        let db_client = &mut db_client.lock().await;
+        let _db_client = &mut db_client.lock().await;
 
         todo!()
     }

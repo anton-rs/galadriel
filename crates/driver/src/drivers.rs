@@ -9,10 +9,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 use ethers::{
     providers::{Middleware, StreamExt},
-    types::{Address, U256},
+    types::{Address, H256, U256},
 };
-use op_challenger_solvers::fault::{AlphabetGame, ClaimData, Clock};
-use std::{sync::Arc, time::Duration};
+use op_challenger_solvers::fault::{AlphabetGame, ClaimData, Clock, FaultGame, Response};
+use std::{cmp::Ordering, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 
 /// The trace for the alphabet game.
@@ -60,7 +60,9 @@ define_driver!(
             tracing::info!(target: "tx-dispatch-driver", "Locked receive channel mutex successfully. Beginning tx dispatch loop.");
 
             while let Some(tx) = locked_receive_ch.recv().await {
-                tracing::info!(target: "tx-dispatch-driver", "Signed transaction request received in dispatch driver. Sending transaction...");
+                tracing::info!(target: "tx-dispatch-driver", "Transaction dispatch request received in dispatch driver. Sending transaction...");
+
+                // TODO: Check the mempool and simulate the transaction prior to sending it.
                 match self.config.l1_provider.send_transaction(tx, None).await {
                     Ok(res) => {
                         tracing::info!(target: "tx-dispatch-driver", "Transaction sent successfully. Tx hash: {}", res.tx_hash());
@@ -129,7 +131,8 @@ define_driver!(
                             // that games that are not locally stored can be fetched and existing
                             // ongoing games can be updated.
                             tracing::info!(target: "dispute-factory-driver", "Fetched root claim data successfully. Locking global state mutex and pushing new game...");
-                            self.state.lock().await.games.push(AlphabetGame {
+                            let mut state = self.state.lock().await;
+                            state.alphabet_games.push(AlphabetGame {
                                 address: game_addr,
                                 created_at,
                                 state: vec![ClaimData {
@@ -164,18 +167,122 @@ define_driver!(
     })
 );
 
+// Whole thing's scuffed, mocking it out.
 define_driver!(
-    FaultGamePlayer,
-    (|self: FaultGamePlayer| {
+    FaultGameWatcher,
+    (|self: FaultGameWatcher| {
         async move {
             loop {
-                tracing::info!(target: "fault-game-player", "Checking for updates in ongoing FaultDisputeGames...");
+                tracing::info!(target: "fault-game-watcher", "Checking for updates in ongoing FaultDisputeGames...");
 
-                // TODO: Look for ongoing disputes.
+                let mut global_state = self.state.lock().await;
+                for game in global_state.alphabet_games.iter_mut() {
+                    let contract =
+                        FaultDisputeGame::new(game.address, Arc::clone(&self.config.l1_provider));
 
-                // Check again in 30 seconds.
-                tracing::debug!(target: "fault-game-player", "Done checking for updates. Sleeping for 30 seconds...");
-                tokio::time::sleep(Duration::from_secs(60)).await;
+                    // TODO: Resolve when clocks are out.
+
+                    // Fetch the latest length of the claim data array in the game.
+                    // TODO: Just add a getter, it's a hassle to use `eth_getStorageAt` for this.
+                    // 🤮
+                    let mut slot = [0u8; 32];
+                    slot[31] = 0x01;
+                    let length = U256::from(
+                        self.config
+                            .l1_provider
+                            .get_storage_at(game.address, H256::from_slice(&slot), None)
+                            .await?
+                            .to_fixed_bytes(),
+                    )
+                    .as_usize();
+
+                    let mut local_len = game.state.len();
+                    match length.cmp(&local_len) {
+                        Ordering::Greater => {
+                            tracing::info!(target: "fault-game-watcher", "New claim data found in game at address {}. Fetching...", game.address);
+
+                            // If there's a single claim in our local copy of the game, we have not
+                            // responded to the root yet. In this case, we need to set the local length
+                            // to 0 so that the following loop covers the root claim.
+                            if local_len == 1 {
+                                local_len = 0;
+                            }
+
+                            // Add the new claims to the local state and process them in-order.
+                            // TODO: Batch query here would reduce RPC calls by a lot.
+                            for i in local_len..length {
+                                // Fetch the claim data at the given index.
+                                let claim_data = contract.claim_data(i.into()).await?;
+
+                                // Add the new claim data to the local state.
+                                game.state.push(ClaimData {
+                                    parent_index: claim_data.0 as usize,
+                                    countered: claim_data.1,
+                                    claim: claim_data.2.into(),
+                                    position: claim_data.3,
+                                    clock: Clock {
+                                        duration: (claim_data.4 >> 64) as u64,
+                                        timestamp: (claim_data.4 & (u64::MAX as u128)) as u64,
+                                    },
+                                });
+
+                                match game.respond(i) {
+                                    Ok(res) => match res {
+                                        Response::Move(is_attack, claim, _) => {
+                                            tracing::debug!(target: "fault-game-watcher", "Dispatching move against claim at index={} for game at address {}", i, game.address);
+                                            // TODO: This is ugly. We should have a single function to
+                                            // dispatch a move.
+                                            let tx = if is_attack {
+                                                contract.attack(i.into(), claim.into()).tx
+                                            } else {
+                                                contract.defend(i.into(), claim.into()).tx
+                                            };
+                                            self.config.tx_sender.send(tx).await?;
+                                            tracing::info!(target: "fault-game-watcher", "Dispatched move against claim at index={} for game at address {}", i, game.address);
+
+                                            // We never need to respond to a secondary move because the
+                                            // claims are processed in-order.
+                                        }
+                                        Response::Step(
+                                            state_index,
+                                            parent_index,
+                                            is_attack,
+                                            state_data,
+                                            proof,
+                                        ) => {
+                                            let tx = contract
+                                                .step(
+                                                    state_index.into(),
+                                                    parent_index.into(),
+                                                    is_attack,
+                                                    state_data,
+                                                    proof,
+                                                )
+                                                .tx;
+                                            self.config.tx_sender.send(tx).await?;
+                                        }
+                                        _ => {
+                                            tracing::debug!(target: "fault-game-watcher", "No response to new claim (index: {}) at address {}", i, game.address);
+                                        }
+                                    },
+                                    Err(e) => {
+                                        tracing::error!(target: "fault-game-watcher", "Failed to formulate response to new claim data: {}", e);
+                                    }
+                                }
+                            }
+                        }
+                        Ordering::Less => {
+                            tracing::error!(target: "fault-game-watcher", "Local claim data length is greater than the on-chain length. This should never happen, please report this as a bug!! Local: {}, On-chain: {}", local_len, length);
+                        }
+                        _ => {
+                            tracing::debug!(target: "fault-game-watcher", "No new claim data found in game at address {}", game.address);
+                        }
+                    }
+                }
+
+                // Check again in 5 minutes.
+                tracing::debug!(target: "fault-game-watcher", "Done checking for updates. Sleeping for 5 minutes...");
+                tokio::time::sleep(Duration::from_secs(60 * 5)).await;
             }
         }
     })
