@@ -284,6 +284,10 @@ define_driver!(
                     }
                 }
 
+                // Drop the mutex lock on the global state so that other drivers may access it
+                // while this thread sleeps.
+                drop(global_state);
+
                 // Check again in 5 minutes.
                 tracing::debug!(target: "fault-game-watcher", "Done checking for updates. Sleeping for 5 minutes...");
                 tokio::time::sleep(Duration::from_secs(60 * 5)).await;
