@@ -142,7 +142,6 @@ define_driver!(
                                 Arc::clone(&self.config.l1_provider),
                             );
                             let created_at = game.created_at().await?;
-                            let root_claim_data = game.claim_data(U256::zero()).await?;
 
                             // TODO: Global state is entirely in memory, this won't do. We need to
                             // persist games to a local database and load them on startup. In
@@ -154,16 +153,7 @@ define_driver!(
                             state.alphabet_games.push(AlphabetGame {
                                 address: game_addr,
                                 created_at,
-                                state: vec![ClaimData {
-                                    parent_index: root_claim_data.0 as usize,
-                                    countered: root_claim_data.1,
-                                    claim: root_claim_data.2.into(),
-                                    position: root_claim_data.3,
-                                    clock: Clock {
-                                        duration: (root_claim_data.4 >> 64) as u64,
-                                        timestamp: (root_claim_data.4 & (u64::MAX as u128)) as u64,
-                                    },
-                                }],
+                                state: Vec::default(),
                                 trace: Arc::new(TRACE),
                             });
                             tracing::info!(target: "dispute-factory-driver", "Pushed new game successfully. Forwarding dispatch to the fault game driver...");
@@ -215,17 +205,10 @@ define_driver!(
                     )
                     .as_usize();
 
-                    let mut local_len = game.state.len();
+                    let local_len = game.state.len();
                     match length.cmp(&local_len) {
                         Ordering::Greater => {
                             tracing::info!(target: "fault-game-watcher", "New claim data found in game at address {}. Fetching...", game.address);
-
-                            // If there's a single claim in our local copy of the game, we have not
-                            // responded to the root yet. In this case, we need to set the local length
-                            // to 0 so that the following loop covers the root claim.
-                            if local_len == 1 {
-                                local_len = 0;
-                            }
 
                             // Add the new claims to the local state and process them in-order.
                             // TODO: Batch query here would reduce RPC calls by a lot.
