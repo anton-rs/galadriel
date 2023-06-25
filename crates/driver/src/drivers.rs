@@ -169,8 +169,8 @@ define_driver!(
 
 // Whole thing's scuffed, mocking it out.
 define_driver!(
-    FaultGameWatcher,
-    (|self: FaultGameWatcher| {
+    FaultGameWatcherDriver,
+    (|self: FaultGameWatcherDriver| {
         async move {
             loop {
                 tracing::info!(target: "fault-game-watcher", "Checking for updates in ongoing FaultDisputeGames...");
@@ -226,6 +226,10 @@ define_driver!(
                                     },
                                 });
 
+                                // TODO(perf): We can be smarter about which claims we respond to. Fetch
+                                // the full state and only respond to claims that need a counter
+                                // from us. Maybe a `respond_to_all` function within the `FaultGame` trait
+                                // would be useful to hide this logic from the driver.
                                 match game.respond(i) {
                                     Ok(res) => match res {
                                         Response::Move(is_attack, claim, _) => {

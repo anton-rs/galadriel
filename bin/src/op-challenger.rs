@@ -8,7 +8,8 @@ use ethers::{
     signers::LocalWallet,
 };
 use op_challenger_driver::{
-    DisputeFactoryDriver, Driver, DriverConfig, GlobalState, TxDispatchDriver,
+    DisputeFactoryDriver, Driver, DriverConfig, FaultGameWatcherDriver, GlobalState,
+    TxDispatchDriver,
 };
 use std::sync::Arc;
 use tokio::{sync::Mutex, task::JoinSet};
@@ -129,6 +130,7 @@ async fn main() -> Result<()> {
         global_state,
         TxDispatchDriver,
         DisputeFactoryDriver,
+        FaultGameWatcherDriver,
     );
 
     Ok(())
