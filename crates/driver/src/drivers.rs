@@ -59,10 +59,29 @@ define_driver!(
             let mut locked_receive_ch = self.config.tx_receiver.lock().await;
             tracing::info!(target: "tx-dispatch-driver", "Locked receive channel mutex successfully. Beginning tx dispatch loop.");
 
-            while let Some(tx) = locked_receive_ch.recv().await {
+            while let Some(mut tx) = locked_receive_ch.recv().await {
                 tracing::info!(target: "tx-dispatch-driver", "Transaction dispatch request received in dispatch driver. Sending transaction...");
 
                 // TODO: Check the mempool and simulate the transaction prior to sending it.
+                match self.config.l1_provider.estimate_gas(&tx, None).await {
+                    Ok(gas) => {
+                        tracing::info!(target: "tx-dispatch-driver", "Transaction simulation successful. Gas estimate: {}", gas);
+                        tx.set_gas(gas);
+                        tx.set_gas_price(
+                            self.config
+                                .l1_provider
+                                .get_gas_price()
+                                .await
+                                .unwrap_or(U256::one())
+                                * 2,
+                        );
+                    }
+                    Err(err) => {
+                        tracing::error!(target: "tx-dispatch-driver", "Error simulating transaction: {}", err);
+                        continue;
+                    }
+                }
+
                 match self.config.l1_provider.send_transaction(tx, None).await {
                     Ok(res) => {
                         tracing::info!(target: "tx-dispatch-driver", "Transaction sent successfully. Tx hash: {}", res.tx_hash());
