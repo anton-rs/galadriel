@@ -48,4 +48,4 @@ mprocs \
   "OP_NODE= docker attach $(find_image_id 'op-node')" \
   "PROPOSER= docker attach $(find_image_id 'op-proposer')" \
   "BATCHER= docker attach $(find_image_id 'op-batcher')" \
-  "CHALLENGER= cargo run --bin op-challenger -- -vvvvv"
+  "CHALLENGER= cargo run --bin op-challenger -- -vvv"

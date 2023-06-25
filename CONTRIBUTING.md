@@ -24,10 +24,10 @@ git clone git@github.com:clabby/op-challenger.git
 nvim start_devnet.sh
 # On the L1 service, port forward the websocket endpoint port (8546)
 nvim $MONOREPO_DIR/ops-bedrock/docker-compose.yml
-# Start the devnet and deploy the mock dispute game factory
+# Start the devnet
 ./start_devnet.sh
 ```
-3. Start the `op-challenger` with information, warning, and error traces enabled.
+3. Start the `op-challenger` with information, warning, and error traces enabled. There are 4 levels of log verbosity, with `-vvvv` showing all log levels.
 ```sh
 cargo run --bin op-challenger -- -vv
 ```
