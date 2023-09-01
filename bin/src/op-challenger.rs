@@ -8,10 +8,11 @@ use ethers::{
     signers::LocalWallet,
 };
 use op_challenger_driver::{
-    DisputeFactoryDriver, Driver, DriverConfig, OutputAttestationDriver, TxDispatchDriver,
+    DisputeFactoryDriver, Driver, DriverConfig, FaultGameWatcherDriver, GlobalState,
+    TxDispatchDriver,
 };
 use std::sync::Arc;
-use tokio::task::JoinSet;
+use tokio::{sync::Mutex, task::JoinSet};
 use tracing::Level;
 
 /// Arguments for the `op-challenger` binary.
@@ -103,16 +104,17 @@ async fn main() -> Result<()> {
         dispute_game_factory,
         l2_output_oracle,
     ));
+    let global_state = Arc::new(Mutex::new(GlobalState::default()));
     tracing::info!(target: "op-challenger-cli", "Driver config created successfully.");
 
     // Creates a new driver stack and starts the driver loops.
     // TODO: Extend to support a configurable driver stack.
     macro_rules! start_driver_stack {
-        ($cfg:expr, $($driver:ident),+ $(,)?) => {
+        ($cfg:expr, $state:expr, $($driver:ident),+ $(,)?) => {
             let mut set = JoinSet::new();
 
             $(set.spawn(
-                $driver::new(Arc::clone(&$cfg)).start_loop()
+                $driver::new(Arc::clone(&$cfg), Arc::clone(&$state)).start_loop()
             );)*
 
             while let Some(result) = set.join_next().await {
@@ -125,9 +127,10 @@ async fn main() -> Result<()> {
     tracing::info!(target: "op-challenger-cli", "Starting driver stack...");
     start_driver_stack!(
         driver_config,
+        global_state,
         TxDispatchDriver,
         DisputeFactoryDriver,
-        OutputAttestationDriver,
+        FaultGameWatcherDriver,
     );
 
     Ok(())

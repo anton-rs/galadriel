@@ -9,7 +9,7 @@ use std::sync::Arc;
 /// Compares the untrusted output root against the trusted output root from the node at a given
 /// block number.
 ///
-/// # Arguments
+/// # Takes
 /// * `node_provider` - The HTTP provider used to query the node for the trusted output root.
 /// * `untrusted_root` - The untrusted output root.
 /// * `block_number` - The block number to query the node for the trusted output root.

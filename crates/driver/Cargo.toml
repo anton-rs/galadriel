@@ -6,6 +6,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+op-challenger-solvers = { path = "../solvers" }
+
 anyhow = "1.0.70"
 async-trait = "0.1.68"
 ethers = { version = "2.0.1", features = ["ws"] }
